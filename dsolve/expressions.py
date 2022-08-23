@@ -1,4 +1,4 @@
-from atoms import Variable, Parameter
+from .atoms import Variable, Parameter
 import re
 import numpy as np
 from sympy import Eq
@@ -18,7 +18,7 @@ class DynamicExpression:
         return eval(''.join(elements))
     
     def __repr__(self):
-        return str(self.sympy)
+        return str(self.sympy).replace(' ','')
 
     def __call__(self, t):
         eq = ''.join([str(Variable(el)(t)) if is_variable(el) else el for el in self.elements])
