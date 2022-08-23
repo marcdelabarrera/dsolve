@@ -1,4 +1,6 @@
-from . import atoms
+import pytest
 
+from dsolve.atoms import Variable
 
-print('succes')
+def test_variable():
+    assert str(Variable('x_{t}'))=='x_{t}'
