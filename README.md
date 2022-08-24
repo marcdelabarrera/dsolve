@@ -25,3 +25,11 @@ z = 'v_t, u_t'
 
 system = Klein(eq = eq, x=x, p=p, z=z, calibration=calibration)
 ```
+
+## Flexible input reading
+
+The standarized way to write a variable is `E_{t}[x_{s}]` to represent the expectation of `x_{s}` at time `t`. but `dsolve` understands other formats. `Ex_{s}`, `E[x_s]` and `Ex_s` are quivalents to  `E_{t}[x_{s}]`, and the subscript `t` is assumed. 
+
+Greek symbols can be writen as `\rho` or just `rho`. ´
+
+`dsolve` understands fractions and sums. `\sum_{i=0}^{2}{x_{i,t}}` produces `x_{0,t}+x_{1,t}+x_{2,t}`
