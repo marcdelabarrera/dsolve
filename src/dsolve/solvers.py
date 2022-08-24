@@ -51,6 +51,7 @@ class Klein():
         Given the system of equations, write it in the form: 
         A_0y(t+1) = A_1@y(t)+gamma@z(t)
         '''
+        self.equations[-1].sympy
         A_0,_ = sym.linear_eq_to_matrix([i.sympy for i in self.equations], self.x1+self.p1)
         A_1,_ = sym.linear_eq_to_matrix(_,self.x+self.p)
         gamma, _ = sym.linear_eq_to_matrix(_, self.z)

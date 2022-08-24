@@ -1,7 +1,10 @@
 import pytest
 
-from dsolve.atoms import Variable, Parameter
+from dsolve.atoms import Variable, Parameter, normalize_string
 
+def test_normalize_string():
+    assert normalize_string('+')=='+'
+    
 def test_variable():
     assert str(Variable('x_{t}'))=='x_{t}'
     assert str(Variable('x_t'))=='x_{t}'

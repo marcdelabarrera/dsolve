@@ -1,4 +1,4 @@
-from dsolve.atoms import Variable, Parameter, encode
+from dsolve.atoms import Variable, Parameter, normalize_string
 import re
 import numpy as np
 from sympy import Eq
@@ -162,10 +162,6 @@ def split(expression:str)->list[str]:
             out += split_fraction(el)
         elif is_sum(el):
             out += split_sum(el)
-        elif is_variable(el):
-            out += [str(Variable(el))]
-        elif is_parameter(el):
-            out += [str(Parameter(el))]
         else:
-            out += [el]
+            out += [normalize_string(el)]
     return out
