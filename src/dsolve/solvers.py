@@ -8,8 +8,6 @@ import sympy as sym
 
 class Klein():
 
-
-
     def __init__(self, 
                     equations:list[str]|str, 
                     x: list[str]|str = None, 
@@ -40,7 +38,6 @@ class Klein():
         if calibration is not None:
             self.system_numeric = self.calibrate(calibration)
             self.system_solution = self.solve()
-
 
     @staticmethod
     def normalize_calibration_keys(calibration):
@@ -245,14 +242,14 @@ class Klein():
 
 
 class MITShock:
-    def __init__(self, z:dict[np.ndarray], x:dict[np.ndarray] = {}, p:dict[np.ndarray] = {}):
+    def __init__(self, z:dict[np.ndarray], x:dict[np.ndarray] = {}, p:dict[np.ndarray] = {})->None:
         self.paths = z|x|p|{'t':list(range([len(iz) for iz in z.values()][0]))}
 
     def plot(self, vars:str=None):
         '''
         Plots the paths for the specified variables
         '''
-        vars=[str(Variable(i)) for i in vars.replace(' ','').split(',')] 
+        vars=[str(Variable(i)) for i in vars.split(',')] 
         nrows = len(vars)//3+1*(len(vars)%3!=0)
         ncols = min(len(vars),3)
         fig, ax = plt.subplots(nrows=nrows, 
