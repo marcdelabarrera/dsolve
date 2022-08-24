@@ -101,6 +101,7 @@ def close_brackets(elements:list[str])->list[str]:
     return out
 
 def classify_string(string):
+    string = normalize_string(string)
     if string[:4]=='\sum':
         return 'sum'
     elif re.match('^\\\\frac{', string) is not None:
@@ -162,6 +163,10 @@ def split(expression:str)->list[str]:
             out += split_fraction(el)
         elif is_sum(el):
             out += split_sum(el)
+        elif is_variable(el):
+            out += [str(Variable(el))]
+        elif is_parameter(el):
+            out += [str(Parameter(el))]
         else:
-            out += [normalize_string(el)]
+            out += [el]
     return out
