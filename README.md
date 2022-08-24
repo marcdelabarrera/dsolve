@@ -4,7 +4,7 @@ A package to solve systems of dynamic equations with Python. It understands
 Latex syntax and it requires minimum specifications from the user end.
 
 
-```
+```python
 from solvers import Klein
 
 # Your latex equations here as a list of strings
