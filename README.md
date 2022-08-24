@@ -3,7 +3,7 @@
 A package to solve systems of dynamic equations with Python. It understands
 Latex syntax and it requires minimum specifications from the user end.
 
-
+The main usage of the package is the following (check the notebook for further examples)
 ```python
 from solvers import Klein
 
