@@ -75,7 +75,7 @@ class Parameter:
             indices = re.split(',',indices)
             if len(indices)>1:
                 raise ValueError('Code cannot handle more than one index for parameters')
-            self.indices = [sympify(i) for i in indices]
+            self.indices = [Symbol(i) for i in indices]
         self.sympy = Symbol(name)
         
     def subs(self, d:dict):
@@ -129,4 +129,5 @@ def encode(string)->str:
     string = string.replace('\r','\\r')
     string = string.replace('\v','\\v')
     string = string.replace('\f','\\f')
+    string = string.replace('\t','\\t')
     return string

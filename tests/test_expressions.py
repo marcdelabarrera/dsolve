@@ -1,6 +1,6 @@
 import pytest
 
-from dsolve.expressions import DynamicExpression
+from dsolve.expressions import DynamicExpression, classify_string
 
 def test_expressions():
     assert str(DynamicExpression('E\pi_{t+1}+1')) == 'E_{t}[\pi_{t+1}]+1'
@@ -20,3 +20,8 @@ def test_sums():
 def test_special_characters():
     assert r'\rho'=='\\rho'
     assert str(DynamicExpression('\rho+1')) == '\\rho+1'
+
+def test_classify():
+    assert classify_string('x_t')=='variable'
+    assert classify_string('x_{i,t}')=='variable'
+    assert classify_string('x_{\theta}')=='parameter'

@@ -108,7 +108,7 @@ def classify_string(string):
         return 'fraction'
     elif str.isdigit(string):
         return 'digit'
-    elif re.search('_{.*t.*}', string) is not None:
+    elif re.search('_{[^\\\]*t.*}', string) is not None:
         return 'variable'
     elif string in ('+','-','/','*','(',')','='):
         return 'operator'
