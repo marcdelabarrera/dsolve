@@ -16,3 +16,4 @@ def test_variable():
 def test_parameter():
     assert str(Parameter('\beta'))=='\\beta'
     assert str(Parameter('\rho_{i}'))=='\\rho_{i}'
+
