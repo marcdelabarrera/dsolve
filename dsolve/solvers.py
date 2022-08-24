@@ -1,5 +1,5 @@
 from expressions import DynamicEcuation, close_brackets
-from atoms import Variable, E
+from atoms import Variable, E, normalize_string
 from scipy.linalg import ordqz, inv
 import matplotlib.pyplot as plt
 import re
@@ -23,10 +23,14 @@ class Klein():
 
         self.indices = indices
         self.indexed = indices is not None
-        self.equations = self.read_equations(equations)
+        self.equations, self.n_eq = self.read_equations(equations)
         self.x, self.x1, self.n_x = self.read_x(x)
         self.p, self.p1, self.n_p = self.read_p(p)
         self.z, self.n_z = self.read_z(z)
+        if self.n_eq>(self.n_x+self.n_p):
+            raise ValueError(f'More equations ({self.n_eq}) than unknowns ({self.n_x+self.n_p})')
+        elif self.n_eq<(self.n_x+self.n_p):
+            raise ValueError(f'More unknowns ({self.n_x+self.n_p}) than equations ({self.n_eq}) ')
         self.type = self.classify_system()
         self.parameters = {k:v for d in [e.parameters for e in self.equations] for k,v in d.items()}
         self.system_symbolic = self.get_matrices()
@@ -34,9 +38,14 @@ class Klein():
         self.system_numeric = None
         self.system_solution = None
         if calibration is not None:
-             self.system_numeric = self.calibrate(calibration)
-             self.system_solution = self.solve()
-        
+            self.system_numeric = self.calibrate(calibration)
+            self.system_solution = self.solve()
+
+
+    @staticmethod
+    def normalize_calibration_keys(calibration):
+        return {normalize_string(k):v for k,v in calibration.items()}
+
     def get_matrices(self)->dict[np.ndarray]:
         '''
         Given the system of equations, write it in the form: 
@@ -59,6 +68,7 @@ class Klein():
         Substitute numerical variables to 
         '''
         #calibration={str(Parameter(k)):v for k,v in calibration.items()}
+        calibration = self.normalize_calibration_keys(calibration)
         self.calibration = calibration
         if inplace:
             self.system_numeric = {k: np.array(v.subs(calibration)).astype(np.float64) for k,v in self.system_symbolic.items()}
@@ -121,7 +131,7 @@ class Klein():
         equations = [DynamicEcuation(eq) for eq in equations]
         if self.indexed:
             equations = self.expand_indices(equations)
-        return [eq for eq in equations]
+        return equations, len(equations)
             
     def read_x(self, x:list[str]|str)->list[sym.Symbol]:
         if x is None:

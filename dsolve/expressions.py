@@ -1,4 +1,4 @@
-from .atoms import Variable, Parameter
+from dsolve.atoms import Variable, Parameter, encode
 import re
 import numpy as np
 from sympy import Eq
@@ -6,8 +6,8 @@ from sympy import Eq
 class DynamicExpression:
     def __init__(self, expression:str):
         self.elements = split(expression)
-        self.variables = {i:Variable(i) for i in self.elements if is_variable(i)}
-        self.parameters = {i:Parameter(i) for i in self.elements if is_parameter(i)}
+        self.variables = {str(Variable(i)):Variable(i) for i in self.elements if is_variable(i)}
+        self.parameters = {str(Parameter(i)):Parameter(i) for i in self.elements if is_parameter(i)}
         self.indexed = np.any([v.indexed for v in self.variables.values()])
 
     @property
@@ -162,6 +162,10 @@ def split(expression:str)->list[str]:
             out += split_fraction(el)
         elif is_sum(el):
             out += split_sum(el)
+        elif is_variable(el):
+            out += [str(Variable(el))]
+        elif is_parameter(el):
+            out += [str(Parameter(el))]
         else:
             out += [el]
     return out

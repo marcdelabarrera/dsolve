@@ -5,6 +5,7 @@ from IPython.display import Latex
 
 class Variable:
     def __init__(self, name:str):
+        name = normalize_string(name)
         self.e_t, self.base, self.indices = self.split(name)
         self.expectation = self.e_t is not None
         self.sympy = Symbol(str(self).replace(' ',''))
@@ -64,6 +65,7 @@ class Variable:
 
 class Parameter:
     def __init__(self, name):
+        name = normalize_string(name)
         self.base =  Symbol(re.sub('_{.*?}','',name))
         self.indices = None
         self.indexed = False
@@ -96,3 +98,35 @@ class Parameter:
 def E(x:Variable, t:Expr|str):
     return Variable.from_elements(x.base, x.indices, e_t = t)
 
+
+def normalize_string(string)->str:
+    '''
+    Normalizes strings adding {} when ommited.
+    Examples
+    --------
+    >>> normalize_string('a_b^c')
+    'a_{b}^{c}'
+    '''
+    string = encode(string)
+    string = string.replace(' ','')                                     #gets rid of any space
+    string = re.sub('^E(?!_)','E_{t}', string)                          #correct E[.] to add E_{t}[.]
+    string = re.sub('(?<=_)[^{]',lambda m: f'{{{m.group()}}}',string)   #correct x_. to x_{.}
+    string = re.sub('(?<=\^)[^{]',lambda m: f'{{{m.group()}}}',string)  #correct x^. to x^{.}
+    if re.search('^E_{[^}]+?}(?!\[)', string) is not None:
+        string = re.search('^E_{[^}]+?}(?!\[)', string).group()+'['+re.sub('^E_{[^}]+?}','',string)+']' #correct E_{t}. for E_{t}[.]
+    return string
+
+
+def encode(string)->str:
+    '''
+    Corrects for special characters and adds an extra \
+    Examples
+    --------
+    >>> encode('\beta')
+    '\\beta'
+    '''
+    string = string.replace('\b','\\b')
+    string = string.replace('\r','\\r')
+    string = string.replace('\v','\\v')
+    string = string.replace('\f','\\f')
+    return string
