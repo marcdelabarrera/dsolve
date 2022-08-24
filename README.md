@@ -23,5 +23,5 @@ x = '\epsilon_{t-1}'
 p = '\pi_t, y_t'
 z = 'v_t, u_t'
 
-system = Klein(eq, x=x, p=p, z=z, calibration=calibration)
+system = Klein(eq = eq, x=x, p=p, z=z, calibration=calibration)
 ```
