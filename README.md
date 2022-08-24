@@ -1,7 +1,7 @@
 # dsolve
 
 A package to solve systems of dynamic equations with Python. It understands
-Latex syntax and it requires minimum specifications from the user end.
+Latex syntax and it requires minimum specifications from the user end. It implements the Klein (2000) algorithm, which allows for static equations. 
 
 The main usage of the package is the following (check the notebook for further examples)
 ```python
