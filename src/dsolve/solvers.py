@@ -1,4 +1,4 @@
-from .expressions import DynamicEcuation, close_brackets
+from .expressions import DynamicEquation, close_brackets
 from .atoms import Variable, E, normalize_string
 from scipy.linalg import ordqz, inv
 import matplotlib.pyplot as plt
@@ -12,7 +12,8 @@ class Klein():
                     equations:list[str]|str, 
                     x: list[str]|str = None, 
                     p: list[str]|str = None, 
-                    z: list[str]|str = None, 
+                    z: list[str]|str = None,
+                    s: list[str]|str = None, 
                     indices: dict[list[int]]= None,
                     calibration:dict = None):
 
@@ -21,10 +22,12 @@ class Klein():
 
         self.indices = indices
         self.indexed = indices is not None
-        self.equations, self.n_eq = self.read_equations(equations)
         self.x, self.x1, self.n_x = self.read_x(x)
         self.p, self.p1, self.n_p = self.read_p(p)
         self.z, self.n_z = self.read_z(z)
+        self.s, self.n_s = self.read_s(s)
+        self. equations, self.dynamic_equations, \
+            self.static_equations, self.n_eq = self.read_equations(equations)
         if self.n_eq>(self.n_x+self.n_p):
             raise ValueError(f'More equations ({self.n_eq}) than unknowns ({self.n_x+self.n_p})')
         elif self.n_eq<(self.n_x+self.n_p):
@@ -48,8 +51,7 @@ class Klein():
         Given the system of equations, write it in the form: 
         A_0y(t+1) = A_1@y(t)+gamma@z(t)
         '''
-        self.equations[-1].sympy
-        A_0,_ = sym.linear_eq_to_matrix([i.sympy for i in self.equations], self.x1+self.p1)
+        A_0,_ = sym.linear_eq_to_matrix([i.sympy for i in self.dynamic_equations], self.x1+self.p1)
         A_1,_ = sym.linear_eq_to_matrix(_,self.x+self.p)
         gamma, _ = sym.linear_eq_to_matrix(_, self.z)
         return {'A_0':A_0, 'A_1':A_1, 'gamma':-gamma}
@@ -125,12 +127,35 @@ class Klein():
                 out.append(el)
         return out
 
-    def read_equations(self, equations:list[str])->list[DynamicEcuation]:
-        equations = [DynamicEcuation(eq) for eq in equations]
+    def read_equations(self, equations:list[str])->list[DynamicEquation]:
+        equations = [DynamicEquation(eq) for eq in equations]
         if self.indexed:
             equations = self.expand_indices(equations)
-        return equations, len(equations)
-            
+        static_equations = [eq for eq in equations if eq.lhs in self.s]
+        d = {str(eq.lhs):eq.rhs for eq in static_equations}
+        dynamic_equations = [eq for eq in equations if eq not in static_equations]
+
+        for i, eq in enumerate(dynamic_equations):
+            if len(eq.free_symbols.intersection(self.s))>0:
+                dynamic_equations[i]=eq.subs(d)
+
+        [eq.subs(d) if len(eq.free_symbols.intersection(self.s))>0 else eq 
+         for eq in dynamic_equations]
+
+        return equations, dynamic_equations, static_equations, len(dynamic_equations)
+
+    def read_s(self, s:list[str]|str)->list[sym.Symbol]:
+        if s is None:
+            return [],0
+        if isinstance(s,str):
+            s = self.split(s)
+        s = [Variable(js) for js in s]
+        if self.indexed:
+            s = self.expand_indices(s)
+        s = [js.sympy for js in s]
+        n_s = len(s)
+        return (s,n_s)
+
     def read_x(self, x:list[str]|str)->list[sym.Symbol]:
         if x is None:
             return [],[],0
@@ -238,7 +263,7 @@ class Klein():
         return MITShock(z, x)
 
     def simulate_forward_looking_system(self, z:dict[np.array]):
-        raise ValueError('Forward Looking not implemented')
+        raise ValueError('Purely forward looking systems are not implemented')
 
 
 class MITShock:

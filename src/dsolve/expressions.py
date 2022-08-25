@@ -1,11 +1,12 @@
 from dsolve.atoms import Variable, Parameter, normalize_string
 import re
 import numpy as np
-from sympy import Eq
+from sympy import Eq, Expr, Symbol
+import sympy as sym
 
 class DynamicExpression:
-    def __init__(self, expression:str):
-        self.elements = split(expression)
+    def __init__(self, expression:str|sym.Expr):
+        self.elements = split(str(expression))
         self.variables = {str(Variable(i)):Variable(i) for i in self.elements if is_variable(i)}
         self.parameters = {str(Parameter(i)):Parameter(i) for i in self.elements if is_parameter(i)}
         self.indexed = np.any([v.indexed for v in self.variables.values()])
@@ -42,7 +43,11 @@ class DynamicExpression:
                 expr.append(el)
         return DynamicExpression(''.join(expr))
 
-class DynamicEcuation(DynamicExpression):
+class DynamicEquation(DynamicExpression):
+    
+    @classmethod
+    def from_sympy(cls, eq:Eq):
+        return cls(f'{eq.lhs}={eq.rhs}')
 
     def __repr__(self):
         rhs, lhs = self.sympy.rhs, self.sympy.lhs
@@ -57,27 +62,42 @@ class DynamicEcuation(DynamicExpression):
         rhs = ''.join(elements[elements.index('=')+1:])
         return Eq(eval(lhs),eval(rhs))
     
+    @property
+    def lhs(self):
+        return self.sympy.lhs
+
+    @property
+    def rhs(self):
+        return self.sympy.rhs
+
+    @property
+    def free_symbols(self):
+        return self.sympy.free_symbols
+
     def __call__(self, t):
         eq = ''.join([str(Variable(el)(t)) if is_variable(el) else el for el in self.elements])
-        return DynamicEcuation(''.join(eq))
+        return DynamicEquation(''.join(eq))
 
     def lag(self, periods:int=1):
         eq = ''.join([str(Variable(el).lag(periods)) if is_variable(el) else el for el in self.elements])
-        return DynamicEcuation(''.join(eq))
+        return DynamicEquation(''.join(eq))
 
     def lead(self, periods:int=1):
         return self.lag(-periods)
 
     def subs(self, d:dict):
-        eq = []
-        for el in self.elements:
-            if is_variable(el):
-                eq.append(str(Variable(el).subs(d)))
-            elif is_parameter(el):
-                eq.append(str(Parameter(el).subs(d)))
-            else:
-                eq.append(el)
-        return DynamicEcuation(''.join(eq))
+        if np.all([Symbol(k) in self.free_symbols for k in d.keys()]):
+            return DynamicEquation.from_sympy(self.sympy.subs(d))
+        else: 
+            eq = []
+            for el in self.elements:
+                if is_variable(el):
+                    eq.append(str(Variable(el).subs(d)))
+                elif is_parameter(el):
+                    eq.append(str(Parameter(el).subs(d)))
+                else:
+                    eq.append(el)
+            return DynamicEquation(''.join(eq))
     
 
 
@@ -155,7 +175,7 @@ def split_sum(sum:str)-> list[str]:
 
 def split(expression:str)->list[str]:
     elements = re.split('(?<=[\=\*/\+\-\(\)])|(?=[\=\*/\+\-\(\)])',expression)
-    elements = [i for i in elements if i!='']
+    elements = [i for i in elements if i.replace(' ','')]
     elements = close_brackets(elements)
     out = []
     for el in elements:

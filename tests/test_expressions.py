@@ -1,6 +1,7 @@
 import pytest
 
-from dsolve.expressions import DynamicExpression, classify_string
+from dsolve.expressions import DynamicExpression, DynamicEquation, classify_string
+import sympy as sym 
 
 def test_expressions():
     assert str(DynamicExpression('E\pi_{t+1}+1')) == 'E_{t}[\pi_{t+1}]+1'
@@ -25,3 +26,7 @@ def test_classify():
     assert classify_string('x_t')=='variable'
     assert classify_string('x_{i,t}')=='variable'
     assert classify_string('x_{\theta}')=='parameter'
+
+def test_from_sympy():
+    assert str(DynamicExpression(sym.Symbol('x')+1))=='x+1'
+    assert str(DynamicEquation.from_sympy(sym.Eq(sym.Symbol('x'),1)))=='1 = x'
