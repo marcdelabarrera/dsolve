@@ -4,7 +4,7 @@ A package to solve systems of dynamic equations with Python. It understands $\La
 
 $$A_0\begin{bmatrix}x_{t+1}\\ E_{t}[p_{t+1}]\end{bmatrix}=A_1\begin{bmatrix}x_{t}\\ p_{t}\end{bmatrix}+\gamma z_t$$
 
-Following Blanchard Kahn notation, $x_{t}$ are state variables (known at time $t$) while $p_{t}$ are forward-looking variables, and $z_t$ are shocks with $E_t[z_{t+1}]=0$.
+Following Blanchard Kahn notation, $x_{t}$ are state variables (known at time $t$) while $p_{t}$ are forward-looking variables, and $z_t$ are shocks with $E_t[z_{t+1}]=0$. The solver uses the Klein (2000) algorithm which allows for $A_0$ to be invertible. 
 
 Returns the matrix solution
 
@@ -16,7 +16,7 @@ and methods to plot impulse responses given a sequence of $z_t$
 
 The main class of the package is `Klein`, which stores and solves the dynamic system. It takes a list of strings that are written as $\LaTeX$ equations, a dictionary that define the numeric values of the parameters, and the specification of `x`, `p` and `z`, specified as a list of $\LaTeX$ strings or a long string separated by commas.  
 
-
+Usage (for more examples check the [notebook tutorial](https://github.com/marcdelabarrera/dsolve/blob/main/notebooks/dsolve_tutorial.ipynb))
 ```python
 from dsolve.solvers import Klein
 
