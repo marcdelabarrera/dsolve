@@ -6,8 +6,9 @@ with open("README.md","r") as fh:
 
 setup(
     name = 'dsolve',
-    version = '0.0.1',
+    version = '0.0.2',
     description = 'Solver of dynamic equations with forward looking variables',
+    long_description_content_type='text/markdown',
     long_description='test',
     py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers"],
     package_dir={'':'src'},
