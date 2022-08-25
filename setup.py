@@ -13,6 +13,7 @@ setup(
     py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers"],
     package_dir={'':'src'},
     author='Marc de la Barrera i Bardalet',
+    url = 'https://github.com/marcdelabarrera/dsolve',
     author_email='mbarrera@mit.edu',
     install_requires = ["scipy >= 1.9.0"],
     extras_require={"dev":["pytest>=7.1.2",],},
