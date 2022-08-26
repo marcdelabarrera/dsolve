@@ -1,9 +1,15 @@
 import pytest
 
 import numpy as np
-from dsolve.solvers import Klein
+from dsolve.solvers import Klein, SystemVariables
 
-def test_klein():
+
+def test_SystemVariables():
+    assert str(SystemVariables(x='x_t').x[0])=='x_{t}'
+    assert str(SystemVariables(x='x_{i,t}', indices={'i':(0,1)}).x[1])=='x_{1,t}'
+
+
+def test_Klein():
     #simple AR(1)
     eq = ['x_{t}=\rho*x_{t-1}+\sigma*eps_{t}']  
     calibration = {'\rho':0.8,'\sigma':1}      

@@ -1,14 +1,18 @@
+from __future__ import annotations
 import re
+from .utils import normalize_string
 from sympy.core.sympify import sympify
 from sympy import Symbol, Expr
 from IPython.display import Latex
+import numpy as np
 
 class Variable:
     def __init__(self, name:str):
         name = normalize_string(name)
         self.e_t, self.base, self.indices = self.split(name)
         self.expectation = self.e_t is not None
-        self.sympy = Symbol(str(self).replace(' ',''))
+        self.realized = np.all(['t' not in str(i) for i in self.indices])
+        self.sympy = Symbol(str(self))
         self.indexed = len(self.indices)>1
 
     @staticmethod
@@ -16,7 +20,7 @@ class Variable:
         e_t = None
         if re.search('E_{', name) is not None:
             e_t = sympify(re.search('(?<=E_{).+?(?=})', name).group())
-            name = re.sub('E_{.*?}\[','',name)[:-1]
+            name = re.search('(?<=\[).*(?=\])',name).group()
         base =  Symbol(re.sub('_{.*?}','',name))
         indices = re.search('(?<=_{).+?(?=})',name).group()
         indices = re.split(',',indices)
@@ -24,16 +28,27 @@ class Variable:
         return e_t, base, indices
     
     def __repr__(self):
-        indices = [str(i).replace(' ','') for i in self.indices]
+        indices = [str(i) for i in self.indices]
         if self.expectation:
-            e_t = str(self.e_t).replace(' ','')
-            return f'E_{{{e_t}}}[{self.base}_{{{",".join(indices)}}}]'
+            return f'E_{{{self.e_t}}}[{self.base}_{{{",".join(indices)}}}]'.replace(' ','')
         else: 
-            return f'{self.base}_{{{",".join(indices)}}}' 
+            return f'{self.base}_{{{",".join(indices)}}}'.replace(' ','') 
     
-    def subs(self, d:dict):
-        indices = [i.subs(d) for i in self.indices]
-        return Variable.from_elements(self.base, indices, e_t=self.e_t)
+    def subs(self, x:dict|float)->Variable|float:
+        '''
+        >>> Variable(x_{i,t}).subs({'i':2})
+        'x_{2,t}'
+        >>> Variable(x_{i,t+1}).subs({'t':0})
+        'x_{i,1}'
+        >>> Variable(x_{i,t}).subs(4)
+        4
+        '''
+        if isinstance(x,dict):
+            indices = [i.subs(x) for i in self.indices]
+            e_t = self.e_t.subs(x) if self.expectation else None
+            return Variable.from_elements(self.base, indices, e_t=e_t)
+        else:
+            return x
 
     @property
     def latex(self):
@@ -41,7 +56,6 @@ class Variable:
 
     @classmethod
     def from_elements(cls, base:Symbol|str, indices:list[Expr], e_t:Expr|str = None):
-        base = str(base)
         indices = [str(i) for i in indices]
         if e_t is not None:
             return cls(f'E_{{{e_t}}}[{base}_{{{",".join(indices)}}}]')
@@ -49,10 +63,14 @@ class Variable:
             return cls(f'{base}_{{{",".join(indices)}}}')
 
     def __call__(self, t):
-        indices = self.indices.copy()
-        indices[-1] = indices[-1].subs({'t':t})
-        e_t = self.e_t.subs({'t':t}) if self.expectation else None
-        return Variable.from_elements(self.base, indices, e_t=e_t)
+        '''
+        Returns the variable evaluated at time t
+        >>> Variable('x_{t}')(4)
+        'x_{4}'
+        '''
+        if self.realized:
+            raise ValueError('Trying to evaluate an evaluated variable')
+        return self.subs({'t':t})
 
     def lag(self, periods:int=1):
         indices = self.indices.copy()
@@ -76,18 +94,29 @@ class Parameter:
             if len(indices)>1:
                 raise ValueError('Code cannot handle more than one index for parameters')
             self.indices = [Symbol(i) for i in indices]
-        self.sympy = Symbol(name)
-        
-    def subs(self, d:dict):
-        if self.indexed:
-            indices = [i.subs(d) for i in self.indices]
+        self.sympy = Symbol(str(self))
+  
+    def subs(self, x:dict|float):
+        '''
+        >>> Parameter(\beta_{i}).subs({'i':2})
+        '\\beta_{2}'
+        >>> Parameter(\sigma_{i}).subs(2.)
+        2.
+        '''
+        if isinstance(x,dict):
+            indices = [i.subs(x) for i in self.indices]
             return Parameter.from_elements(self.base, indices)
         else:
-            return Parameter(str(self.sympy))
-
-
+            return x
+   
     def __repr__(self):
-        return str(self.sympy)
+        if self.indexed:
+            indices = [str(i) for i in self.indices]
+            return f'{self.base}_{{{",".join(indices)}}}'.replace(' ','') 
+
+        else:  
+            return f'{self.base}' 
+
 
     @classmethod
     def from_elements(cls, base:Symbol|str, indices:list[Expr]):
@@ -95,39 +124,11 @@ class Parameter:
         indices = [str(i) for i in indices]
         return cls(f'{base}_{{{",".join(indices)}}}')
 
-def E(x:Variable, t:Expr|str):
+def E(x:Variable, t:Expr|str='t'):
     return Variable.from_elements(x.base, x.indices, e_t = t)
 
 
-def normalize_string(string)->str:
-    '''
-    Normalizes strings adding {} when ommited.
-    Examples
-    --------
-    >>> normalize_string('a_b^c')
-    'a_{b}^{c}'
-    '''
-    string = encode(string)
-    string = string.replace(' ','')                                     #gets rid of any space
-    string = re.sub('^E(?!_)','E_{t}', string)                          #correct E[.] to add E_{t}[.]
-    string = re.sub('(?<=_)[^{]',lambda m: f'{{{m.group()}}}',string)   #correct x_. to x_{.}
-    string = re.sub('(?<=\^)[^{]',lambda m: f'{{{m.group()}}}',string)  #correct x^. to x^{.}
-    if re.search('^E_{[^}]+?}(?!\[)', string) is not None:
-        string = re.search('^E_{[^}]+?}(?!\[)', string).group()+'['+re.sub('^E_{[^}]+?}','',string)+']' #correct E_{t}. for E_{t}[.]
-    return string
 
 
-def encode(string)->str:
-    '''
-    Corrects for special characters and adds an extra \
-    Examples
-    --------
-    >>> encode('\beta')
-    '\\beta'
-    '''
-    string = string.replace('\b','\\b')
-    string = string.replace('\r','\\r')
-    string = string.replace('\v','\\v')
-    string = string.replace('\f','\\f')
-    string = string.replace('\t','\\t')
-    return string
+
+    

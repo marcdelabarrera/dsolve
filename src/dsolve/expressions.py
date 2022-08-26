@@ -1,4 +1,5 @@
-from dsolve.atoms import Variable, Parameter, normalize_string
+from .atoms import Variable, Parameter
+from .utils import normalize_string
 import re
 import numpy as np
 from sympy import Eq, Expr, Symbol
