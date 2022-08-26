@@ -1,3 +1,4 @@
+from asyncore import read
 from .expressions import DynamicEquation, close_brackets
 from .atoms import Variable, E
 from .utils import normalize_string, normalize_dict
@@ -10,6 +11,9 @@ from dataclasses import dataclass
 
 
 class SystemVariables():
+    '''
+    Class that reads and contains all information regarding system variables.
+    '''
     def __init__(self,  x: list[str]|str = None, 
                         p: list[str]|str = None, 
                         z: list[str]|str = None,
@@ -94,7 +98,52 @@ class SystemVariables():
         l = [i for i in l if i!='' and i!=',']
         return l
 
+class SystemEquations():
+    '''
+    Class that reads and contains all information regarding system variables.
+    '''
+    def __init__(self, 
+                    equations:list[str]|str,
+                    vars: SystemVariables = None,
+                    indices: dict[list[int]] = None):
+        self.dynamic_equations, self.static_equations = self.read_equations(equations, vars, indices)
 
+
+    def expand_indices(self, vars:list, indices:dict[list[int]]=None)->list:
+        if indices is None:
+            return vars
+        index = list(indices.keys())[0]
+        start, end  = indices[index]
+        out = []
+        for el in vars:
+            if el.indexed:
+                out = out + [el.subs({index:i}) for i in range(start, end+1)]
+            else:
+                out.append(el)
+        return out
+
+    def read_equations(self, 
+                        equations:list[str],
+                        vars:SystemVariables=None, 
+                        indices: dict[list[int]]= None)->list[DynamicEquation]:
+
+        equations = [DynamicEquation(eq) for eq in equations]
+        if indices is not None:
+            equations = self.expand_indices(equations)
+        if vars is None or vars.s == []:
+            dynamic_equations =[eq.sympy for eq in equations]
+            static_equations = []
+        else:
+            static_equations = [eq for eq in equations if eq.lhs in vars.s]
+            d = {str(eq.lhs):eq.rhs for eq in static_equations}
+            dynamic_equations = [eq for eq in equations if eq not in static_equations]
+            for i, eq in enumerate(dynamic_equations):
+                if len(eq.free_symbols.intersection(vars.s))>0:
+                    dynamic_equations[i]=eq.subs(d)
+            static_equations =[eq.sympy for eq in static_equations]
+            dynamic_equations =[eq.sympy for eq in dynamic_equations]
+        
+        return dynamic_equations, static_equations
 
 class Klein():
     def __init__(self, 
