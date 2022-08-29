@@ -288,6 +288,7 @@ class Klein():
         return d    
 
     def simulate_backward_looking_system(self, z:dict[np.array], x0: np.array):
+        raise ValueError('Not implemented')
         sol = self.system_solution
         Theta_x, L = sol['Theta_x'], sol['L']
         T = z.shape[1]
@@ -298,7 +299,7 @@ class Klein():
             x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
         z = {str(iz):iz_t for iz, iz_t in zip(self.vars.z, z)}
         x = {str(ix):ix_t for ix, ix_t in zip(self.vars.x, x[:,:-1])}
-        return MITShock(z, x)
+        return z|x
 
     def simulate_forward_looking_system(self, z:dict[np.array]):
         raise ValueError('Purely forward looking systems are not implemented')
@@ -317,36 +318,3 @@ class Klein():
             d_t = {k:v[t] for k,v in d.items()}
             y_t.append(float(expr.subs(d_t)))
         return ax.plot(d['t'],y_t)   
-
-
-        vars=[str(Variable(i)) for i in vars.split(',')] 
-        out=[]
-        for ivar in vars:
-            out.append(ax.plot(d['t'],d[ivar], label=rf'${ivar}$'))
-        return out
-
-
-def my_plotter(ax, data1, data2, param_dict):
-    out = ax.plot(data1, data2, **param_dict)
-    return out
-
-class MITShock:
-    def __init__(self, z:dict[np.ndarray], x:dict[np.ndarray] = {}, p:dict[np.ndarray] = {})->None:
-        self.paths = z|x|p|{'t':list(range([len(iz) for iz in z.values()][0]))}
-
-    def plot(self, vars:str=None):
-        '''
-        Plots the paths for the specified variables
-        '''
-        vars=[str(Variable(i)) for i in vars.split(',')] 
-        nrows = len(vars)//3+1*(len(vars)%3!=0)
-        ncols = min(len(vars),3)
-        fig, ax = plt.subplots(nrows=nrows, 
-                               ncols=ncols, 
-                               figsize=(ncols*5, nrows*3),
-                               squeeze=False)
-
-        for i,var in enumerate(vars):
-            ax[i//ncols,i%ncols].plot(self.paths['t'], self.paths[var])
-            ax[i//ncols,i%ncols].set(title=fr'${var}$', xlabel=r'$t$')
-        plt.tight_layout()

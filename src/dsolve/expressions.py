@@ -1,5 +1,5 @@
 from .atoms import Variable, Parameter
-from .utils import normalize_string
+from .utils import normalize_string, normalize_dict
 import re
 import numpy as np
 from sympy import Eq, Expr, Symbol
@@ -19,6 +19,9 @@ class DynamicExpression:
         elements = [f'parameters[r"{i}"].sympy' if i in parameters else i for i in elements]
         return eval(''.join(elements))
     
+    def __float__(self):
+        return float(self.sympy)
+
     def __repr__(self):
         return str(self.sympy).replace(' ','')
 
@@ -34,12 +37,19 @@ class DynamicExpression:
         return self.lag(-periods)
 
     def subs(self, d:dict):
+        d = normalize_dict(d)
         expr = []
         for el in self.elements:
             if is_variable(el):
-                expr.append(str(Variable(el).subs(d)))
+                if el in d.keys():
+                    expr.append(str(Variable(el).subs(d[el])))
+                else:
+                    expr.append(str(Variable(el).subs(d)))
             elif is_parameter(el):
-                expr.append(str(Parameter(el).subs(d)))
+                if el in d.keys():
+                    expr.append(str(Variable(el).subs(d[el])))
+                else:
+                    expr.append(str(Parameter(el).subs(d)))
             else:
                 expr.append(el)
         return DynamicExpression(''.join(expr))
@@ -127,8 +137,8 @@ def classify_string(string):
         return 'sum'
     elif re.match('^\\\\frac{', string) is not None:
         return 'fraction'
-    elif str.isdigit(string):
-        return 'digit'
+    elif str.isdigit(string.replace('.','')):
+        return 'number'
     elif re.search('_{[^\\\]*t.*}', string) is not None:
         return 'variable'
     elif string in ('+','-','/','*','(',')','='):
@@ -139,8 +149,8 @@ def classify_string(string):
 def is_sum(string)->bool:
     return classify_string(string)=='sum'
 
-def is_digit(string)->bool:
-    return classify_string(string)=='digit'
+def is_number(string)->bool:
+    return classify_string(string)=='number'
 
 def is_variable(string)->bool:
     return classify_string(string)=='variable'

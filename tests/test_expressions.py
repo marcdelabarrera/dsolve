@@ -30,3 +30,9 @@ def test_classify():
 def test_from_sympy():
     assert str(DynamicExpression(sym.Symbol('x')+1))=='x+1'
     assert str(DynamicEquation.from_sympy(sym.Eq(sym.Symbol('x'),1)))=='1 = x'
+
+def test_subs():
+    assert DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3})
+    assert DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3, 'E_t[x_{t+1}]':2})
+    print(DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3, 'E_t[x_{t+1}]':2}))
+    assert float(DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3, 'E_t[x_{t+1}]':2}))==1.
