@@ -15,13 +15,15 @@ def test_variable():
     assert str(Variable('\theta_{t}'))==r'\theta_{t}'
     assert str(Variable('\theta_{t}'))=='\\theta_{t}'
 
-def test_parameter():
+def test_Parameter():
     assert str(Parameter('\beta'))=='\\beta'
     assert str(Parameter('\beta'))==r'\beta'
     assert str(Parameter('\rho_{i}'))=='\\rho_{i}'
     assert str(Parameter('\sigma'))=='\sigma'
     assert str(Parameter('\theta'))=='\\theta'
     assert str(Parameter('\rho_{\theta}')) == '\\rho_{\\theta}'
+    assert str(Parameter('\rho_{i}').subs({'i':4})) == '\\rho_{4}'
+    assert str(Parameter('\rho').subs({'i':4})) == '\\rho'
 
 def test_E():
     assert str(E(Variable('x_{t+1}'),'t'))=='E_{t}[x_{t+1}]'

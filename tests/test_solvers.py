@@ -2,7 +2,7 @@ import pytest
 
 import numpy as np
 from dsolve.solvers import Klein, SystemVariables, SystemEquations
-
+import sympy as sym
 
 def test_SystemVariables():
     assert str(SystemVariables(x='x_t').x[0])=='x_{t}'
@@ -10,8 +10,14 @@ def test_SystemVariables():
 
 def test_SystemEquations():
     assert SystemEquations(equations=['x_{t}+y_{t}=z_{t}']).static_equations==[]
+    s = SystemEquations(equations=['x_t+y_t=z_t', 'i_t=3*x_t'], vars=SystemVariables(s='i_t'))
+    assert s.static_equations==[sym.Eq(sym.Symbol('i_{t}'), 3*sym.Symbol('x_{t}'))]
+    s = SystemEquations(equations=['x_{i,t}=1'], indices={'i':(0,3)})
+    assert s.dynamic_equations[2]==sym.Eq(sym.Symbol('x_{2,t}'),1)
 
-    
+
+
+
 def test_Klein():
     #simple AR(1)
     eq = ['x_{t}=\rho*x_{t-1}+\sigma*eps_{t}']  
@@ -30,3 +36,5 @@ def test_Klein():
     system = Klein(eq, x='v_{t-1}', p='x_t,y_t', z='eps_t', s='i_t', calibration=calibration)
     assert isinstance(system.system_solution, dict)
     assert system.n_s == 1 
+    assert np.all(system.normalize_z({'eps_{0}':1},T=4)==np.array([1.,0,0,0]))
+    assert np.all(system.normalize_z({'eps_{0}':1, 'eps_{2}':2.},T=4)==np.array([1.,0,2.,0]))

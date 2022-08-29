@@ -104,8 +104,11 @@ class Parameter:
         2.
         '''
         if isinstance(x,dict):
-            indices = [i.subs(x) for i in self.indices]
-            return Parameter.from_elements(self.base, indices)
+            if self.indices is None:
+                return Parameter.from_elements(self.base)
+            else:
+                indices = [i.subs(x) for i in self.indices]
+                return Parameter.from_elements(self.base, indices)
         else:
             return x
    
@@ -119,10 +122,13 @@ class Parameter:
 
 
     @classmethod
-    def from_elements(cls, base:Symbol|str, indices:list[Expr]):
+    def from_elements(cls, base:Symbol|str, indices:list[Expr]=None):
         base = str(base)
-        indices = [str(i) for i in indices]
-        return cls(f'{base}_{{{",".join(indices)}}}')
+        if indices is None:
+            return cls(base)
+        else:
+            indices = [str(i) for i in indices]
+            return cls(f'{base}_{{{",".join(indices)}}}')
 
 def E(x:Variable, t:Expr|str='t'):
     return Variable.from_elements(x.base, x.indices, e_t = t)
