@@ -1,5 +1,6 @@
 import pytest
 from dsolve.atoms import Variable, Parameter, E
+from sympy import Symbol, sympify
 
 def test_variable():
     assert str(Variable('x_{t}'))=='x_{t}'
@@ -9,11 +10,16 @@ def test_variable():
     assert str(Variable('\pi^{p}_{t}'))=='\pi^{p}_{t}'
     assert str(Variable('x_{t}')(4))=='x_{4}'
     assert str(Variable('x_{t}').lag(4))=='x_{t-4}'
-    assert Variable('x_{i,t}').subs(2.)==2.
+    assert Variable('x_{i,t}').eval(2).value==2.
     assert str(Variable('x_{i,t}').subs({'i':0}))=='x_{0,t}'
     assert str(Variable('x_{i,t+1}').subs({'t':0}))=='x_{i,1}'
     assert str(Variable('\theta_{t}'))==r'\theta_{t}'
     assert str(Variable('\theta_{t}'))=='\\theta_{t}'
+
+
+def test_split():
+    assert Variable.split('x_{t}')==(None, Symbol('x'),[Symbol('t')])
+    assert Variable.split('E_{t}[x_{t+1}]')==(sympify('t'), Symbol('x'),[sympify('t+1')])
 
 def test_Parameter():
     assert str(Parameter('\beta'))=='\\beta'

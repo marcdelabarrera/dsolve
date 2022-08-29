@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 from .atoms import Variable, Parameter
 from .utils import normalize_string, normalize_dict
 import re
@@ -20,12 +21,19 @@ class DynamicExpression:
         return eval(''.join(elements))
     
     def __float__(self):
-        return float(self.sympy)
+        if self.variables=={} and self.parameters=={}:
+            return float(self.sympy)
+        else:
+            raise ValueError('Trying to convert to a float a DynamicExpression with unevaluated parameters or variables')
 
     def __repr__(self):
         return str(self.sympy).replace(' ','')
 
     def __call__(self, t):
+        '''
+        >>> DynamicExpression('x_{t}+y_{t+1}')(3)
+        x_{3}+y_{4}
+        '''
         eq = ''.join([str(Variable(el)(t)) if is_variable(el) else el for el in self.elements])
         return DynamicExpression(''.join(eq))
 
@@ -37,17 +45,23 @@ class DynamicExpression:
         return self.lag(-periods)
 
     def subs(self, d:dict):
+        '''
+        >>> DynamicExpression('x_t+y_t').subs({'x_{t}':4})
+        4+y_{t}
+        >>> DynamicExpression('x_t+y_t').subs({'t':4})
+        x_{4}+y_{4}
+        '''
         d = normalize_dict(d)
         expr = []
         for el in self.elements:
             if is_variable(el):
                 if el in d.keys():
-                    expr.append(str(Variable(el).subs(d[el])))
+                    expr.append(str(d[el]))
                 else:
                     expr.append(str(Variable(el).subs(d)))
             elif is_parameter(el):
                 if el in d.keys():
-                    expr.append(str(Variable(el).subs(d[el])))
+                    expr.append(str(d[el]))
                 else:
                     expr.append(str(Parameter(el).subs(d)))
             else:
@@ -59,6 +73,11 @@ class DynamicEquation(DynamicExpression):
     @classmethod
     def from_sympy(cls, eq:Eq):
         return cls(f'{eq.lhs}={eq.rhs}')
+
+    @classmethod
+    def from_lhs_rhs(cls, lhs, rhs):
+        return cls(f'{lhs}={rhs}')
+
 
     def __repr__(self):
         rhs, lhs = self.sympy.rhs, self.sympy.lhs
@@ -97,6 +116,9 @@ class DynamicEquation(DynamicExpression):
         return self.lag(-periods)
 
     def subs(self, d:dict):
+        return DynamicEquation.from_lhs_rhs(DynamicExpression(self.rhs).subs(d), DynamicExpression(self.lhs).subs(d))
+
+        return 
         if np.all([Symbol(k) in self.free_symbols for k in d.keys()]):
             return DynamicEquation.from_sympy(self.sympy.subs(d))
         else: 
@@ -153,6 +175,17 @@ def is_number(string)->bool:
     return classify_string(string)=='number'
 
 def is_variable(string)->bool:
+    '''
+    Returns true if string can be parsed into a variable.
+    String contains '_{[^\\\]*t.*}'
+    Evaluated variables are not considered variables.
+    >>> is_variable('x_{t}')
+    True
+    >>> is_variable('\sigma')
+    False
+    >>> is_variable('x_{3}')
+    False
+    '''
     return classify_string(string)=='variable'
 
 def is_parameter(string)->bool:

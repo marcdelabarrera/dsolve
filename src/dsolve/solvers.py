@@ -8,19 +8,19 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 import sympy as sym
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class SystemVariables:
     '''
     Class that reads and contains all information regarding system variables.
     '''
-    x : list[sym.Symbol]
-    p : list[sym.Symbol]
-    z : list[sym.Symbol]
-    s : list[sym.Symbol]
-    x1 : list[sym.Symbol]
-    p1 : list[sym.Symbol]
+    x : list[sym.Symbol] = field(default_factory=list)
+    p : list[sym.Symbol] = field(default_factory=list)
+    z : list[sym.Symbol] = field(default_factory=list)
+    s : list[sym.Symbol] = field(default_factory=list)
+    x1 : list[sym.Symbol] = field(default_factory=list)
+    p1 : list[sym.Symbol] = field(default_factory=list)
  
 @dataclass
 class SystemEquations():
@@ -216,7 +216,7 @@ class Klein():
         if T is not None:
             out = {str(k):np.zeros(T, dtype=float) for k in self.vars.z}
             for iz in z:
-                t = Variable(iz).indices[0]
+                t = Variable(iz).indices[-1]
                 out[f'{str(Variable(iz).base)}_{{t}}'][t]=z[str(Variable(iz))]
         else:
             T = np.max([len(v) for v in z.values()])
@@ -274,18 +274,7 @@ class Klein():
         p = {str(ip):ip_t for ip, ip_t in zip(self.vars.p, p[:,:-1])}
         d =  z|x|p|x1|p1|{'t':np.array(range(T))}
         d = self.solve_static(d)
-        return d
-
-    def solve_static(self, d:dict[np.array])->dict[np.array]:
-        if self.vars.s == []:
-            return d
-        for s in self.equations.static.calibrated:
-            s_t = []
-            for t in d['t']:
-                d_t = {k:v[t] for k,v in d.items()}
-                s_t.append(float(s.rhs.subs(d_t)))
-            d[str(s.lhs)]= np.array(s_t)
-        return d    
+        return MITShock(d,self)
 
     def simulate_backward_looking_system(self, z:dict[np.array], x0: np.array):
         sol = self.system_solution
@@ -314,12 +303,7 @@ class Klein():
             d[str(s.lhs)]= np.array(s_t)
         return d   
 
-    def plot(self, ax, d, vars:str, param_dict:dict=None):
-        vars=[str(Variable(i)) for i in vars.split(',')] 
-        out=[]
-        for ivar in vars:
-            out.append(ax.plot(d['t'],d[ivar], label=rf'${ivar}$'))
-        return out
+    
 
     def plot_expr(self, ax, d, expr:str):
         expr = DynamicExpression(expr)
@@ -327,4 +311,24 @@ class Klein():
         for t in d['t']:
             d_t = {k:v[t] for k,v in d.items()}
             y_t.append(float(expr.subs(d_t)))
-        return ax.plot(d['t'],y_t)   
+        return ax.plot(d['t'],y_t, label=rf'${str(expr)}$')
+
+
+class MITShock:
+    def __init__(self, d:dict, model:Klein):
+        self.d = d
+        self.model = model
+    
+    def plot(self, ax, vars:str, **kwargs):
+        
+        vars=[str(Variable(i)) for i in vars.split(',')]
+        out=[]
+        for ivar in vars:
+            label = kwargs['label'] if 'label' in kwargs else rf'${ivar}$' 
+            out.append(ax.plot(self.d['t'],self.d[ivar], label=label))
+        if 'title' in kwargs:
+            out.append(ax.set(title=kwargs['title']))
+        if 'legend' in kwargs:
+            out.append(ax.legend())
+        
+        return out
