@@ -288,7 +288,6 @@ class Klein():
         return d    
 
     def simulate_backward_looking_system(self, z:dict[np.array], x0: np.array):
-        raise ValueError('Not implemented')
         sol = self.system_solution
         Theta_x, L = sol['Theta_x'], sol['L']
         T = z.shape[1]
@@ -303,6 +302,17 @@ class Klein():
 
     def simulate_forward_looking_system(self, z:dict[np.array]):
         raise ValueError('Purely forward looking systems are not implemented')
+
+    def solve_static(self, d:dict[np.array])->dict[np.array]:
+        if self.vars.s == []:
+            return d
+        for s in self.equations.static.calibrated:
+            s_t = []
+            for t in d['t']:
+                d_t = {k:v[t] for k,v in d.items()}
+                s_t.append(float(s.rhs.subs(d_t)))
+            d[str(s.lhs)]= np.array(s_t)
+        return d   
 
     def plot(self, ax, d, vars:str, param_dict:dict=None):
         vars=[str(Variable(i)) for i in vars.split(',')] 
