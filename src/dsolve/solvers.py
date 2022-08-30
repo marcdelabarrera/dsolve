@@ -69,11 +69,14 @@ class Klein():
 
         if indices is not None and len(indices)>1:
             raise ValueError('Systems with more than one index still not implemented')
-        
-        index = list(indices.keys())[0]
-        start, end  = indices[index]
-
-        self.indices = SystemIndices(index, start, end)
+        self.indexed = indices is not None
+        if self.indexed:
+            self.indexed = True
+            index = list(indices.keys())[0]
+            start, end  = indices[index]
+            self.indices = SystemIndices(index, start, end)
+        else:
+            self.indices = None
         self.equations, self.vars, self.parameters = self.read_system(equations, x, p, z, s, indices)
         self.n_eq, self.n_x, self.n_p, self.n_z, self.n_s = len(self.equations.dynamic.symbolic), len(self.vars.x), len(self.vars.p), len(self.vars.z), len(self.vars.s)
 
@@ -174,7 +177,8 @@ class Klein():
         Substitute numerical variables to 
         '''
         calibration = normalize_dict(calibration)
-        calibration = self.expand_calibration(calibration)
+        if self.indexed:
+            calibration = self.expand_calibration(calibration)
         self.equations.dynamic.calibrated =  [eq.subs(calibration) for eq in self.equations.dynamic.symbolic]
         self.equations.static.calibrated  =  [eq.subs(calibration) for eq in self.equations.static.symbolic]
         self.parameters.calibration = calibration

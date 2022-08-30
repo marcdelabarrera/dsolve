@@ -13,7 +13,7 @@ class Variable:
     ----------
     e_t (Expr): time at which expectation is taken
     base (Symbol): name of the variable
-    indices (list[Expr]): indices, the last one representing time. Allowed indices are i,j,k
+    indices (list[Expr]): indices, the last one representing time. Allowed indices are i,j,k,l
     value (float): 
     '''
     def __init__(self, name:str, value:float=None):
@@ -28,7 +28,7 @@ class Variable:
     
     def is_indexed(self):
         indices = self.indices
-        return np.any([str(i) in ['i','j','k'] for i in indices])
+        return np.any([str(i) in ['i','j','k', 'l'] for i in indices])
 
     @staticmethod
     def split(name:str)->tuple[Expr, Symbol, list[Expr]]:
@@ -50,7 +50,7 @@ class Variable:
         if re.search('(?<=_{).+?(?=})',name) is None:
             raise ValueError('Variable needs to have at least one index')
         indices = re.search('(?<=_{).+?(?=})',name).group()
-        indices = re.split(',',indices) if ',' in indices else re.split('(?=t)',indices)
+        indices = re.split(',',indices) if ',' in indices else re.split('(?=[ijklt])',indices)
         indices = [sympify(i) for i in indices if i!='']
         return e_t, base, indices
     
