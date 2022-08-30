@@ -7,7 +7,7 @@ from sympy import Eq, Expr, Symbol
 import sympy as sym
 
 class DynamicExpression:
-    def __init__(self, expression:str|sym.Expr):
+    def __init__(self, expression:str):
         self.elements = split(str(expression))
         self.variables = {str(Variable(i)):Variable(i) for i in self.elements if is_variable(i)}
         self.parameters = {str(Parameter(i)):Parameter(i) for i in self.elements if is_parameter(i)}
@@ -68,8 +68,21 @@ class DynamicExpression:
                 expr.append(el)
         return DynamicExpression(''.join(expr))
 
+    @property
+    def free_symbols(self):
+        return self.sympy.free_symbols
+    
+    def calibrate(self, calibration):
+        calibration = normalize_dict(calibration)
+        return DynamicExpression(self.sympy.subs(calibration))
+
+
 class DynamicEquation(DynamicExpression):
     
+    def calibrate(self, calibration):
+        calibration = normalize_dict(calibration)
+        return DynamicEquation.from_sympy(self.sympy.subs(calibration))
+
     @classmethod
     def from_sympy(cls, eq:Eq):
         return cls(f'{eq.lhs}={eq.rhs}')
@@ -100,9 +113,7 @@ class DynamicEquation(DynamicExpression):
     def rhs(self):
         return self.sympy.rhs
 
-    @property
-    def free_symbols(self):
-        return self.sympy.free_symbols
+
 
     def __call__(self, t):
         eq = ''.join([str(Variable(el)(t)) if is_variable(el) else el for el in self.elements])
@@ -116,25 +127,18 @@ class DynamicEquation(DynamicExpression):
         return self.lag(-periods)
 
     def subs(self, d:dict):
-        return DynamicEquation.from_lhs_rhs(DynamicExpression(self.rhs).subs(d), DynamicExpression(self.lhs).subs(d))
-
-        return 
-        if np.all([Symbol(k) in self.free_symbols for k in d.keys()]):
-            return DynamicEquation.from_sympy(self.sympy.subs(d))
-        else: 
-            eq = []
-            for el in self.elements:
-                if is_variable(el):
-                    eq.append(str(Variable(el).subs(d)))
-                elif is_parameter(el):
-                    eq.append(str(Parameter(el).subs(d)))
-                else:
-                    eq.append(el)
-            return DynamicEquation(''.join(eq))
-    
+        return DynamicEquation.from_lhs_rhs(DynamicExpression(self.lhs).subs(d), DynamicExpression(self.rhs).subs(d))
 
 
 
+def fix_scientific_notation(elements:list[str])->list[str]:
+    out = []
+    elements = iter(elements)
+    for i in elements:
+        out.append(i)
+        if re.search('[0-9\.]+e',out[-1]) is not None:
+            out[-1]=out[-1]+next(elements)+next(elements)
+    return out
 
 def close_brackets(elements:list[str])->list[str]:
     '''
@@ -157,9 +161,9 @@ def classify_string(string):
     string = normalize_string(string)
     if string[:4]=='\sum':
         return 'sum'
-    elif re.match('^\\\\frac{', string) is not None:
+    elif re.match('^\\\\frac', string) is not None:
         return 'fraction'
-    elif str.isdigit(string.replace('.','')):
+    elif str.isdigit(string.replace('.','')) or re.search('[0-9\.]e',string):
         return 'number'
     elif re.search('_{[^\\\]*t.*}', string) is not None:
         return 'variable'
@@ -213,14 +217,16 @@ def split_sum(sum:str)-> list[str]:
     index = re.search("(?<=sum\_{).+?(?=\=)",sum).group()
     start = int(re.search("(?<=sum\_{.=).+?(?=})",sum).group())
     end = int(re.search("(?<=\^{).+?(?=})",sum).group())
-    term = re.sub('\\\sum_{.+?}\^{.+?}','',sum)[1:-1]
+    term = re.sub('^\\\sum_{.+?}\^{.+?}','',sum)[1:-1]
     term = DynamicExpression(term)
     return split(f'({"+".join([str(term.subs({index:i})) for i in range(start,end+1)])})')   
 
 def split(expression:str)->list[str]:
+    expression = expression.replace('\frac','\\frac')
     elements = re.split('(?<=[\=\*/\+\-\(\)])|(?=[\=\*/\+\-\(\)])',expression)
     elements = [i for i in elements if i.replace(' ','')]
     elements = close_brackets(elements)
+    elements = fix_scientific_notation(elements)
     out = []
     for el in elements:
         if is_fraction(el):

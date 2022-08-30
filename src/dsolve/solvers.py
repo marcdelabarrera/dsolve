@@ -1,7 +1,7 @@
 from __future__ import annotations
 from asyncore import read
 from .expressions import DynamicEquation, close_brackets, DynamicExpression
-from .atoms import Variable, E
+from .atoms import Variable, E, Parameter
 from .utils import normalize_string, normalize_dict
 from scipy.linalg import ordqz, inv
 import matplotlib.pyplot as plt
@@ -45,7 +45,19 @@ class SystemParameters:
     def __call__(self):
         return self.parameters
 
+@dataclass
+class SystemIndices:
+    index: str
+    start:int
+    end:int
+
 class Klein():
+
+    @property
+    def free_symbols(self):
+        return set.union(*[eq.free_symbols for eq in self.equations.dynamic.symbolic+self.equations.static.symbolic])
+
+
     def __init__(self, 
                     equations:list[str]|str, 
                     x: list[str]|str = None, 
@@ -57,7 +69,11 @@ class Klein():
 
         if indices is not None and len(indices)>1:
             raise ValueError('Systems with more than one index still not implemented')
+        
+        index = list(indices.keys())[0]
+        start, end  = indices[index]
 
+        self.indices = SystemIndices(index, start, end)
         self.equations, self.vars, self.parameters = self.read_system(equations, x, p, z, s, indices)
         self.n_eq, self.n_x, self.n_p, self.n_z, self.n_s = len(self.equations.dynamic.symbolic), len(self.vars.x), len(self.vars.p), len(self.vars.z), len(self.vars.s)
 
@@ -106,7 +122,7 @@ class Klein():
             static_equations =SystemEquationsStatic([eq.sympy for eq in static_equations])
             dynamic_equations =SystemEquationsDynamic([eq.sympy for eq in dynamic_equations])
         free_symbols = set.union(*[eq.free_symbols for eq in dynamic_equations.symbolic+static_equations.symbolic])
-        parameters = free_symbols.difference(x+p+z+s+x1+p1)
+        parameters = list(free_symbols.difference(x+p+z+s+x1+p1))
         return( SystemEquations(dynamic_equations, static_equations),\
                 SystemVariables(x,p,z,s,x1,p1),\
                 SystemParameters(parameters))
@@ -124,6 +140,16 @@ class Klein():
             else:
                 out.append(el)
         return out
+
+    
+    def expand_calibration(self, calibration:dict)->dict:
+        index = self.indices.index
+        start, end = self.indices.start, self.indices.end
+        for k,v in calibration.items():
+            if len(np.atleast_1d(v))>1:
+                calibration  = calibration | {str(Parameter(k).subs({index:i})):v[i] for i in range(start, end+1)}
+                calibration.pop(k)
+        return calibration
     
     @staticmethod
     def split(string)->list[str]:
@@ -148,6 +174,7 @@ class Klein():
         Substitute numerical variables to 
         '''
         calibration = normalize_dict(calibration)
+        calibration = self.expand_calibration(calibration)
         self.equations.dynamic.calibrated =  [eq.subs(calibration) for eq in self.equations.dynamic.symbolic]
         self.equations.static.calibrated  =  [eq.subs(calibration) for eq in self.equations.static.symbolic]
         self.parameters.calibration = calibration
@@ -169,15 +196,15 @@ class Klein():
         A_0, A_1, gamma = system_numeric['A_0'], system_numeric['A_1'], system_numeric['gamma']
         S, T, _, _, Q, Z = ordqz(A_0, A_1, output='complex',sort=lambda alpha,beta: np.abs(beta/(alpha+1e-10))<1)
         Q = Q.conjugate().T
-        n_s = len([i for i in np.abs(np.diag(T)/np.diag(S)) if i<1]) #number of stable eigenvalues
-        
+        #n_s = len([i for i in np.abs(np.diag(T)/np.diag(S)) if i<1]) #number of stable eigenvalues
+        n_s = len([np.abs(T[i,i]/S[i,i]) for i in range(S.shape[0]) if np.abs(S[i,i])>1e-6 and np.abs(T[i,i]/S[i,i])<1])
         #print(f'System with {n_s} stable eigenvalues and {self.n_x} pre-determined variables.')
         
-        #if n_s>len(self.x):
-        #    raise ValueError('Multiple solutions')
+        if n_s>len(self.vars.x):
+            raise ValueError('Multiple solutions')
 
-        #elif n_s<len(self.x):
-        #    raise ValueError('No solution')
+        elif n_s<len(self.vars.x):
+            raise ValueError('No solution')
 
         if self.type == 'forward-looking': 
             return {'N': np.real(Z@(-inv(T)@Q@gamma))}
@@ -305,13 +332,7 @@ class Klein():
 
     
 
-    def plot_expr(self, ax, d, expr:str):
-        expr = DynamicExpression(expr)
-        y_t = []
-        for t in d['t']:
-            d_t = {k:v[t] for k,v in d.items()}
-            y_t.append(float(expr.subs(d_t)))
-        return ax.plot(d['t'],y_t, label=rf'${str(expr)}$')
+    
 
 
 class MITShock:
@@ -328,7 +349,24 @@ class MITShock:
             out.append(ax.plot(self.d['t'],self.d[ivar], label=label))
         if 'title' in kwargs:
             out.append(ax.set(title=kwargs['title']))
-        if 'legend' in kwargs:
+        if 'legend' in kwargs and kwargs['legend']: 
+            out.append(ax.legend())
+        
+        return out
+
+    def plot_expr(self, ax, eq:str, **kwargs):
+        eq = DynamicEquation(eq)
+        eq = eq.subs(self.model.parameters.calibration)
+        label = kwargs['label'] if 'label' in kwargs else None
+        y_t = []
+        out = []
+        for t in self.d['t']:
+            d_t = {k:v[t] for k,v in self.d.items()}
+            y_t.append(float(eq.subs(d_t).rhs))
+        out.append(ax.plot(self.d['t'], y_t, label=label))
+        if 'title' in kwargs:
+            out.append(ax.set(title=kwargs['title']))
+        if 'legend' in kwargs and kwargs['legend']:
             out.append(ax.legend())
         
         return out

@@ -15,6 +15,11 @@ def test_variable():
     assert str(Variable('x_{i,t+1}').subs({'t':0}))=='x_{i,1}'
     assert str(Variable('\theta_{t}'))==r'\theta_{t}'
     assert str(Variable('\theta_{t}'))=='\\theta_{t}'
+    assert Variable('x_{i,t}').indexed
+    assert Variable('x_{it}').indexed
+    assert Variable('x_{it+1}').indexed
+
+
 
 
 def test_split():

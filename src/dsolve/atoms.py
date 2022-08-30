@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from .utils import normalize_string
+from .utils import normalize_string, normalize_dict
 from sympy.core.sympify import sympify
 from sympy import Symbol, Expr
 from IPython.display import Latex
@@ -13,7 +13,7 @@ class Variable:
     ----------
     e_t (Expr): time at which expectation is taken
     base (Symbol): name of the variable
-    indices (list[Expr]): indices, the last one representing time.
+    indices (list[Expr]): indices, the last one representing time. Allowed indices are i,j,k
     value (float): 
     '''
     def __init__(self, name:str, value:float=None):
@@ -24,11 +24,19 @@ class Variable:
         self.expectation = self.e_t is not None
         self.realized = value is not None
         self.sympy = Symbol(str(self))
-        self.indexed = len(self.indices)>1
+        self.indexed = self.is_indexed()
+    
+    def is_indexed(self):
+        indices = self.indices
+        return np.any([str(i) in ['i','j','k'] for i in indices])
 
     @staticmethod
     def split(name:str)->tuple[Expr, Symbol, list[Expr]]:
         '''
+        Given a normalized string, splits it into an expectation term, 
+        a base, and a list of indices.
+        Examples
+        --------
         >>> split('E_{t+1}[x^{p}_{t+2})')
         (t+1, x^{p}, [t+2])
         >>> split('x^{p}_{i,t+2})'
@@ -42,8 +50,8 @@ class Variable:
         if re.search('(?<=_{).+?(?=})',name) is None:
             raise ValueError('Variable needs to have at least one index')
         indices = re.search('(?<=_{).+?(?=})',name).group()
-        indices = re.split(',',indices)
-        indices = [sympify(i) for i in indices]
+        indices = re.split(',',indices) if ',' in indices else re.split('(?=t)',indices)
+        indices = [sympify(i) for i in indices if i!='']
         return e_t, base, indices
     
     def __repr__(self):
@@ -58,10 +66,13 @@ class Variable:
     def eval(self, x:float)->float:
         '''
         Evaluates a variable at a given numeric value.
-        >>> Variable('x_{i,t}').subs(4)
+        Examples
+        --------
+        >>> Variable('x_{i,t}').eval(4)
+        4.0
         
         '''
-        return Variable(str(self), float(x))
+        return Variable(self, float(x))
 
     def subs(self, x:dict)->Variable:
         '''
@@ -83,6 +94,7 @@ class Variable:
         'x_{i,1}'
       
         '''
+        x = normalize_dict(x)
         indices = [i.subs(x) for i in self.indices]
         e_t = self.e_t.subs(x) if self.expectation else None
         return Variable.from_elements(self.base, indices, e_t=e_t)
@@ -92,7 +104,7 @@ class Variable:
         return(Latex(f'${self}$'))
 
     @classmethod
-    def from_elements(cls, base:Symbol|str, indices:list[Expr], e_t:Expr|str = None):
+    def from_elements(cls, base:str, indices:list[str], e_t:str = None):
         indices = [str(i) for i in indices]
         if e_t is not None:
             return cls(f'E_{{{e_t}}}[{base}_{{{",".join(indices)}}}]')

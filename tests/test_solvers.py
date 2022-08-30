@@ -38,3 +38,4 @@ def test_Klein():
     assert system.n_s == 1 
     assert np.all(system.normalize_z({'eps_{0}':1},T=4)==np.array([1.,0,0,0]))
     assert np.all(system.normalize_z({'eps_{0}':1, 'eps_{2}':2.},T=4)==np.array([1.,0,2.,0]))
+

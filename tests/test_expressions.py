@@ -14,6 +14,10 @@ def test_fractions():
     assert str(DynamicExpression(r'\frac{a+b}{c+d}'))=='(a+b)/(c+d)'
     assert str(DynamicExpression(r'\frac{\frac{a}{b}}{c+d}'))=='a/(b*(c+d))'
 
+def test_scientific_notation():
+    assert str(DynamicExpression('10e-4+x_{t}'))=='x_{t}+0.001'
+    assert str(DynamicExpression('10e+4+x_{t}'))=='x_{t}+100000.0'
+    
 def test_sums():
     assert str(DynamicExpression('\sum_{i=0}^{1}{x_{i}}'))=='x_{0}+x_{1}'
     assert str(DynamicExpression('\sum_{i=0}^{1}{x_{i,t}}'))=='x_{0,t}+x_{1,t}'
