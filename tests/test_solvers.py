@@ -39,3 +39,10 @@ def test_Klein():
     assert np.all(system.normalize_z({'eps_{0}':1},T=4)==np.array([1.,0,0,0]))
     assert np.all(system.normalize_z({'eps_{0}':1, 'eps_{2}':2.},T=4)==np.array([1.,0,2.,0]))
 
+def test_indices():
+    eq = ['x_{it}=rho*x_{it-1}+eps_{t}']
+    #system = Klein(eq, indices={'i':(0,1)})
+    #assert str(system.equations.dynamic.symbolic[0]) == 'Eq(x_{0,t}, eps_{t} + rho*x_{0,t-1})'
+    eq = ['x_{ijt}=rho_i*x_{ijt-1}+eps_{t}']
+    system = Klein(eq, x = 'x_{ijt-1}', z='eps_{t}', indices={'i':(0,1), 'j':(0,1)})
+    assert str(system.equations.dynamic.symbolic[0]) == 'Eq(x_{0,0,t}, eps_{t} + rho_{0}*x_{0,0,t-1})'

@@ -9,6 +9,7 @@ import re
 import numpy as np
 import sympy as sym
 from dataclasses import dataclass, field
+from itertools import product
 
 @dataclass
 class SystemVariables:
@@ -47,9 +48,9 @@ class SystemParameters:
 
 @dataclass
 class SystemIndices:
-    index: str
-    start:int
-    end:int
+    indices: list[str]
+    start:list[int]
+    end: list[int]
 
 class Klein():
 
@@ -67,23 +68,13 @@ class Klein():
                     indices: dict[list[int]]= None,
                     calibration:dict = None):
 
-        if indices is not None and len(indices)>1:
-            raise ValueError('Systems with more than one index still not implemented')
         self.indexed = indices is not None
-        if self.indexed:
-            self.indexed = True
-            index = list(indices.keys())[0]
-            start, end  = indices[index]
-            self.indices = SystemIndices(index, start, end)
-        else:
-            self.indices = None
-        self.equations, self.vars, self.parameters = self.read_system(equations, x, p, z, s, indices)
+        self.indices, self.vars, self.equations, self.parameters = self.read_system(equations, x, p, z, s, indices)
         self.n_eq, self.n_x, self.n_p, self.n_z, self.n_s = len(self.equations.dynamic.symbolic), len(self.vars.x), len(self.vars.p), len(self.vars.z), len(self.vars.s)
-
-        #if self.n_eq>(self.n_x+self.n_p):
-        #    raise ValueError(f'More equations ({self.n_eq}) than unknowns ({self.n_x+self.n_p})')
-        #elif self.n_eq<(self.n_x+self.n_p):
-        #    raise ValueError(f'More unknowns ({self.n_x+self.n_p}) than equations ({self.n_eq}) ')
+        if self.n_eq>(self.n_x+self.n_p):
+            raise ValueError(f'More equations ({self.n_eq}) than unknowns ({self.n_x+self.n_p})')
+        elif self.n_eq<(self.n_x+self.n_p):
+            raise ValueError(f'More unknowns ({self.n_x+self.n_p}) than equations ({self.n_eq}) ')
         self.type = self.classify_system()
         self.system_symbolic = self.get_matrices()
         self.system_numeric = None
@@ -93,15 +84,15 @@ class Klein():
             self.system_solution = self.solve()
         else:
             self.calibration, self.system_numeric, self.solution = None, None, None
+    
+    def read_indices(self, indices:dict[list[int]])->SystemIndices:
+        if indices is None:
+            return None
+        indices, start, end  = list(indices.keys()), [indices[i][0] for i in indices], [indices[i][1] for i in indices]
+        indices = SystemIndices(indices, start, end)
+        return indices
 
-    def read_system(self,
-                    equations:list[str]|str, 
-                    x: list[str]|str = None, 
-                    p: list[str]|str = None, 
-                    z: list[str]|str = None,
-                    s: list[str]|str = None, 
-                    indices: dict[list[int]]= None):
-        
+    def read_variables(self, x,p,z,s, indices:SystemIndices=None)->SystemVariables:
         x,p,z,s = [self.split(i) if isinstance(i,str) else i for i in [x,p,z,s]]
         x,p,z,s = [[Variable(j) for j in i] if i is not None else [] for i in [x,p,z,s]]
         if indices is not None:
@@ -109,6 +100,9 @@ class Klein():
         x1 = [ix.lead(1) for ix in x]
         p1 = [E(ip.lead(1),'t') for ip in p]
         x,p,z,s,x1,p1 = [[j.sympy for j in i] for i in [x,p,z,s,x1,p1]]
+        return SystemVariables(x,p,z,s,x1,p1)
+    
+    def read_equations(self, equations, s, indices):
         equations = [DynamicEquation(eq) for eq in equations]
         if indices is not None:
             equations = self.expand_indices(equations, indices)
@@ -124,22 +118,34 @@ class Klein():
                     dynamic_equations[i]=eq.subs(d)
             static_equations =SystemEquationsStatic([eq.sympy for eq in static_equations])
             dynamic_equations =SystemEquationsDynamic([eq.sympy for eq in dynamic_equations])
-        free_symbols = set.union(*[eq.free_symbols for eq in dynamic_equations.symbolic+static_equations.symbolic])
-        parameters = list(free_symbols.difference(x+p+z+s+x1+p1))
-        return( SystemEquations(dynamic_equations, static_equations),\
-                SystemVariables(x,p,z,s,x1,p1),\
-                SystemParameters(parameters))
+        return SystemEquations(dynamic_equations, static_equations)
+
+    def read_system(self,
+                    equations:list[str]|str, 
+                    x: list[str]|str = None, 
+                    p: list[str]|str = None, 
+                    z: list[str]|str = None,
+                    s: list[str]|str = None, 
+                    indices: dict[list[int]]= None):
+        
+        indices = self.read_indices(indices)
+        vars = self.read_variables(x,p,z,s,indices)
+        equations = self.read_equations(equations, vars.s, indices)
+        free_symbols = set.union(*[eq.free_symbols for eq in equations.dynamic.symbolic+equations.static.symbolic])
+        parameters = SystemParameters(list(free_symbols.difference(vars.x+vars.p+vars.z+vars.s+vars.x1+vars.p1)))
+        return ( indices,vars,equations,parameters)
     
     @staticmethod
     def expand_indices(l:list=None, indices:dict[list[int]]=None)->list[Variable]:
         if indices is None or l is None:
-            return l
-        index = list(indices.keys())[0]
-        start, end  = indices[index]
+            return l 
         out = []
+
+        ind=list(product(*[list(range(start, end+1)) for start, end in zip(indices.start, indices.end)]))
+    
         for el in l:
             if el.indexed:
-                out = out + [el.subs({index:i}) for i in range(start, end+1)]
+                out = out+ [el.subs({k:v for k,v in zip(indices.indices,i)}) for i in ind]
             else:
                 out.append(el)
         return out
@@ -335,9 +341,6 @@ class Klein():
         return d   
 
     
-
-    
-
 
 class MITShock:
     def __init__(self, d:dict, model:Klein):
