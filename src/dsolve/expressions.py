@@ -3,8 +3,12 @@ from .atoms import Variable, Parameter
 from .utils import normalize_string, normalize_dict
 import re
 import numpy as np
-from sympy import Eq, Expr, Symbol
+from sympy import Eq, Expr, Symbol, log, exp
 import sympy as sym
+
+def flatten(l):
+    return [item for sublist in l for item in sublist]
+
 
 class DynamicExpression:
     def __init__(self, expression:str):
@@ -12,6 +16,7 @@ class DynamicExpression:
         self.variables = {str(Variable(i)):Variable(i) for i in self.elements if is_variable(i)}
         self.parameters = {str(Parameter(i)):Parameter(i) for i in self.elements if is_parameter(i)}
         self.indexed = np.any([v.indexed for v in self.variables.values()])
+        self.indices = list(set(flatten([v.indices for v in self.variables.values()])))
 
     @property
     def sympy(self):
@@ -167,7 +172,7 @@ def classify_string(string):
         return 'number'
     elif re.search('_{[^\\\]*t.*}', string) is not None:
         return 'variable'
-    elif string in ('+','-','/','*','(',')','='):
+    elif string in ('+','-','/','*','(',')','=','log','exp'):
         return 'operator'
     else:
         return 'parameter'

@@ -30,6 +30,16 @@ class Variable:
         indices = self.indices
         return np.any([str(i) in ['i','j','k', 'l'] for i in indices])
 
+    def reset_t(self):
+        '''
+        >>> Variable('x_{0}').reset_t()
+        x_{t}
+        '''
+        indices = self.indices.copy()
+        indices[-1]='t'
+        return Variable.from_elements(self.base, indices, e_t=self.e_t)
+
+
     @staticmethod
     def split(name:str)->tuple[Expr, Symbol, list[Expr]]:
         '''
@@ -48,7 +58,7 @@ class Variable:
             name = re.search('(?<=\[).*(?=\])',name).group()
         base =  Symbol(re.sub('_{.*?}','',name))
         if re.search('(?<=_{).+?(?=})',name) is None:
-            raise ValueError('Variable needs to have at least one index')
+            raise ValueError(f'Variable {name} needs to have at least one index')
         indices = re.search('(?<=_{).+?(?=})',name).group()
         indices = re.split(',',indices) if ',' in indices else re.split('(?=[ijklt])',indices)
         indices = [sympify(i) for i in indices if i!='']
@@ -138,18 +148,22 @@ class Variable:
         return self.lag(-periods)
 
 class Parameter:
+    '''
+    indices: ijkl
+    issues: rho_{v,i} is not allowed. rho^v_i is.
+    '''
     def __init__(self, name):
         name = normalize_string(name)
-        self.base =  Symbol(re.sub('_{.*?}','',name))
+        #self.base =  Symbol(re.sub('_{.*?}','',name))
         self.indices = None
-        self.indexed = False
-        if re.search('(?<=_{).+?(?=})',name) is not None:
-            self.indexed = True
+        self.indexed = re.search('(?<=_{)[0-9ijkl,]+?(?=})',name) is not None
+        if self.indexed:
+            self.base =  Symbol(re.sub('_{.*?}','',name))
             indices = re.search('(?<=_{).+?(?=})',name).group()
-            indices = re.split(',',indices)
-            if len(indices)>1:
-                raise ValueError('Code cannot handle more than one index for parameters')
-            self.indices = [Symbol(i) for i in indices]
+            indices = re.split(',',indices) if ',' in indices else re.split('(?=[ijkl])',indices)
+            self.indices = [sympify(i) for i in indices if i!='']
+        else:
+            self.base =  Symbol(name)
         self.sympy = Symbol(str(self))
   
     def subs(self, x:dict|float):

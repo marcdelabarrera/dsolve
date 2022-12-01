@@ -29,6 +29,7 @@ def test_split():
 def test_Parameter():
     assert str(Parameter('\beta'))=='\\beta'
     assert str(Parameter('\beta'))==r'\beta'
+    assert Parameter('\rho_{v}').indexed==False
     assert str(Parameter('\rho_{i}'))=='\\rho_{i}'
     assert str(Parameter('\sigma'))=='\sigma'
     assert str(Parameter('\theta'))=='\\theta'

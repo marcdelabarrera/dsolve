@@ -52,7 +52,7 @@ class SystemIndices:
     start:list[int]
     end: list[int]
 
-class Klein():
+class Klein:
 
     @property
     def free_symbols(self):
@@ -77,6 +77,7 @@ class Klein():
             raise ValueError(f'More unknowns ({self.n_x+self.n_p}) than equations ({self.n_eq}) ')
         self.type = self.classify_system()
         self.system_symbolic = self.get_matrices()
+   
         self.system_numeric = None
         self.system_solution = None
         if calibration is not None:
@@ -137,26 +138,35 @@ class Klein():
     
     def expand_index(self, l, i, start, stop):
         out = []
-
-        ind=list(product(*[list(range(start, end+1)) for start, end in zip(indices.start, indices.end)]))
-    
         for el in l:
-            if el.indexed:
-                out = out+ [el.subs({k:v for k,v in zip(indices.indices,i)}) for i in ind]
+            if sym.Symbol(i) in el.indices:
+                out=out+[el.subs({i:j}) for j in range(start,stop+1)]
             else:
                 out.append(el)
         return out
 
+    def expand_indices(self, l:list=None, indices:SystemIndices=None)->list[Variable]:
+        if indices is None or l is None:
+            return l 
+        out = l.copy()
+        for i in range(len(indices.indices)):
+            out = self.expand_index(out, indices.indices[i],indices.start[i],indices.end[i])
+        return out
     
-    def expand_calibration(self, calibration:dict)->dict:
-        index = self.indices.index
-        start, end = self.indices.start, self.indices.end
-        for k,v in calibration.items():
-            if len(np.atleast_1d(v))>1:
-                calibration  = calibration | {str(Parameter(k).subs({index:i})):v[i] for i in range(start, end+1)}
+    def expand_calibration_index(self, calibration, index):
+        index, start, stop = index
+        for k,v in calibration.items(): 
+            if Parameter(k).indices is not None and sym.Symbol(index) in Parameter(k).indices:
+                calibration=calibration|{str(Parameter(k).subs({index:i})):v[i-start] for i in range(start, stop+1)}
                 calibration.pop(k)
         return calibration
-    
+
+    def expand_calibration(self, calibration:dict)->dict:
+        indices = self.indices
+        for i in range(len(indices.indices)):
+            calibration=self.expand_calibration_index(calibration, (indices.indices[i], indices.start[i],indices.end[i]))
+        return calibration
+
     @staticmethod
     def split(string)->list[str]:
         l = re.split('(?<=,)|(?=,)',string)
@@ -164,16 +174,15 @@ class Klein():
         l = [i for i in l if i!='' and i!=',']
         return l
 
-
     def get_matrices(self)->dict[np.ndarray]:
         '''
         Given the system of equations, write it in the form: 
         A_0y(t+1) = A_1@y(t)+gamma@z(t)
         '''
-        A_0,_ = sym.linear_eq_to_matrix([i for i in self.equations.dynamic.symbolic], self.vars.x1+self.vars.p1)
-        A_1,_ = sym.linear_eq_to_matrix(_,self.vars.x+self.vars.p)
-        gamma, _ = sym.linear_eq_to_matrix(_, self.vars.z)
-        return {'A_0':A_0, 'A_1':A_1, 'gamma':-gamma}
+        A,_ = sym.linear_eq_to_matrix([i for i in self.equations.dynamic.symbolic], self.vars.x1+self.vars.p1)
+        B,_ = sym.linear_eq_to_matrix(_,self.vars.x+self.vars.p)
+        gamma, C = sym.linear_eq_to_matrix(_, self.vars.z)
+        return {'A':A, 'B':B, 'gamma':-gamma, 'C': C}
 
     def calibrate(self, calibration: dict[float], inplace=False)->dict[np.array]:
         '''
@@ -185,8 +194,12 @@ class Klein():
         self.equations.dynamic.calibrated =  [eq.subs(calibration) for eq in self.equations.dynamic.symbolic]
         self.equations.static.calibrated  =  [eq.subs(calibration) for eq in self.equations.static.symbolic]
         self.parameters.calibration = calibration
-        self.system_numeric = {k: np.array(v.subs(calibration)).astype(np.float64) for k,v in self.system_symbolic.items()}
 
+        try:
+            self.system_numeric = {k: np.array(v.subs(calibration)).astype(np.float64) for k,v in self.system_symbolic.items()}
+        except:
+            print({str(i) for i in self.parameters()}.difference(calibration.keys()))
+            raise ValueError('Error')
 
     def solve(self)->dict[np.ndarray]:
         '''
@@ -200,18 +213,20 @@ class Klein():
             raise ValueError('System is not calibrated.')
 
         system_numeric = self.system_numeric
-        A_0, A_1, gamma = system_numeric['A_0'], system_numeric['A_1'], system_numeric['gamma']
-        S, T, _, _, Q, Z = ordqz(A_0, A_1, output='complex',sort=lambda alpha,beta: np.abs(beta/(alpha+1e-10))<1)
+        A, B, gamma = system_numeric['A'], system_numeric['B'], system_numeric['gamma']
+        S, T, _, _, Q, Z = ordqz(A, B, output='complex',sort=lambda alpha,beta: np.round(np.abs(beta/np.maximum(alpha,1e-15)),6)<=1)
         Q = Q.conjugate().T
         #n_s = len([i for i in np.abs(np.diag(T)/np.diag(S)) if i<1]) #number of stable eigenvalues
-        n_s = len([np.abs(T[i,i]/S[i,i]) for i in range(S.shape[0]) if np.abs(S[i,i])>1e-6 and np.abs(T[i,i]/S[i,i])<1])
+        n_s = len([_ for i in range(S.shape[0]) if np.abs(S[i,i])>1e-6 and np.round(np.abs(T[i,i]/S[i,i]),6)<=1])
         #print(f'System with {n_s} stable eigenvalues and {self.n_x} pre-determined variables.')
         
         if n_s>len(self.vars.x):
-            raise ValueError('Multiple solutions')
+            print(f'Eigenvalues: {np.diag(np.abs(T/S))}')
+            raise ValueError(f'Multiple solutions: {n_s} stable eigenvalues for {len(self.vars.x)} pre-determined variables')
 
         elif n_s<len(self.vars.x):
-            raise ValueError('No solution')
+            print(f'Eigenvalues: {np.diag(np.abs(T/S))}')
+            raise ValueError(f'No solution: {n_s} stable eigenvalues for {len(self.vars.x)} pre-determined variables')
 
         if self.type == 'forward-looking': 
             return {'N': np.real(Z@(-inv(T)@Q@gamma))}
@@ -251,7 +266,7 @@ class Klein():
             out = {str(k):np.zeros(T, dtype=float) for k in self.vars.z}
             for iz in z:
                 t = Variable(iz).indices[-1]
-                out[f'{str(Variable(iz).base)}_{{t}}'][t]=z[str(Variable(iz))]
+                out[str(Variable(iz).reset_t())][t]=z[str(Variable(iz))]
         else:
             T = np.max([len(v) for v in z.values()])
             out = {str(k):np.zeros(T,dtype=float) for k in self.vars.z}
@@ -337,13 +352,15 @@ class Klein():
             d[str(s.lhs)]= np.array(s_t)
         return d   
 
-    
-
 class MITShock:
     def __init__(self, d:dict, model:Klein):
         self.d = d
         self.model = model
     
+    def __call__(self, var:str):
+        var = str(Variable(var))
+        return self.d[var]
+        
     def plot(self, ax, vars:str, **kwargs):
         
         vars=[str(Variable(i)) for i in vars.split(',')]

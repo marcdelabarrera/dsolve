@@ -39,3 +39,6 @@ def test_subs():
     assert DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3})
     assert DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3, 'E_t[x_{t+1}]':2})
     assert float(DynamicExpression('i_t-E_t[x_{t+1}]').subs({'i_t':3, 'E_t[x_{t+1}]':2}))==1.
+
+def test_indices():
+    assert DynamicEquation('x_{it}=y_{it}').indices == ['i','t']
