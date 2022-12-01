@@ -135,10 +135,7 @@ class Klein():
         parameters = SystemParameters(list(free_symbols.difference(vars.x+vars.p+vars.z+vars.s+vars.x1+vars.p1)))
         return ( indices,vars,equations,parameters)
     
-    @staticmethod
-    def expand_indices(l:list=None, indices:dict[list[int]]=None)->list[Variable]:
-        if indices is None or l is None:
-            return l 
+    def expand_index(self, l, i, start, stop):
         out = []
 
         ind=list(product(*[list(range(start, end+1)) for start, end in zip(indices.start, indices.end)]))
