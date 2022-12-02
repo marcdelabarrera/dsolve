@@ -15,7 +15,7 @@ setup(
     author='Marc de la Barrera i Bardalet',
     url = 'https://github.com/marcdelabarrera/dsolve',
     author_email='mbarrera@mit.edu',
-    install_requires = ["scipy >= 1.9.0", "sympy >= 1.11"],
+    install_requires = ["scipy >= 1.9.0", "sympy >= 1.11", "numpy >=1.20.0"],
     extras_require={"dev":["pytest>=7.1.2",],},
     classifiers =[
         "Programming Language :: Python :: 3.10"
