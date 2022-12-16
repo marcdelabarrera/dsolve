@@ -10,7 +10,7 @@ setup(
     description = 'Solver of dynamic equations with forward looking variables',
     long_description = long_description,
     long_description_content_type='text/markdown',
-    py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers", "dsolve.utils","dsolve.statespace"],
+    py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers", "dsolve.utils","dsolve.statespace", "dsolve.linearization"],
     package_dir={'':'src'},
     author='Marc de la Barrera i Bardalet',
     url = 'https://github.com/marcdelabarrera/dsolve',
