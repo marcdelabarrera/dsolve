@@ -4,7 +4,7 @@ A package to solve systems of dynamic equations with Python. It understands $\La
 
 $$A_0\begin{bmatrix}x_{t+1}\\ E_{t}[p_{t+1}]\end{bmatrix}=A_1\begin{bmatrix}x_{t}\\ p_{t}\end{bmatrix}+\gamma z_t$$
 
-Following Blanchard Kahn notation, $x_{t}$ are state variables (known at time $t$) while $p_{t}$ are forward-looking variables, and $z_t$ are shocks with $E_t[z_{t+1}]=0$. The solver uses the Klein (2000) algorithm which allows for $A_0$ to be invertible. 
+with $x_t$ given. Following Blanchard Kahn notation, $x_{t}$ are state variables (known at time $t$) while $p_{t}$ are forward-looking variables, and $z_t$ are shocks with $E_t[z_{t+1}]=0$. The solver uses the Klein (2000) algorithm which allows for $A_0$ to be invertible. 
 
 Returns the matrix solution
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 from asyncore import read
-from .expressions import DynamicEquation, close_brackets, DynamicExpression
-from .atoms import Variable, E, Parameter
-from .utils import normalize_string, normalize_dict
+import pandas as pd
+from dsolve.expressions import DynamicEquation, close_brackets, DynamicExpression
+from dsolve.atoms import Variable, E, Parameter
+from dsolve.utils import normalize_string, normalize_dict
 from scipy.linalg import ordqz, inv
 import matplotlib.pyplot as plt
 import re
@@ -52,12 +53,10 @@ class SystemIndices:
     start:list[int]
     end: list[int]
 
-class Klein:
-
+class DynamicSystem:
     @property
     def free_symbols(self):
         return set.union(*[eq.free_symbols for eq in self.equations.dynamic.symbolic+self.equations.static.symbolic])
-
 
     def __init__(self, 
                     equations:list[str]|str, 
@@ -263,7 +262,7 @@ class Klein:
         '''
         z = normalize_dict(z)
         if T is not None:
-            out = {str(k):np.zeros(T, dtype=float) for k in self.vars.z}
+            out = {str(k):np.zeros(T+1, dtype=float) for k in self.vars.z}
             for iz in z:
                 t = Variable(iz).indices[-1]
                 out[str(Variable(iz).reset_t())][t]=z[str(Variable(iz))]
@@ -351,6 +350,46 @@ class Klein:
                 s_t.append(float(s.rhs.subs(d_t)))
             d[str(s.lhs)]= np.array(s_t)
         return d   
+
+
+
+def simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L):
+     T = z.shape[1]
+     x = np.zeros((Theta_x.shape[0],T+1))
+     p = np.zeros((Theta_p.shape[0], T))
+     x[:,0] = x0
+     for t,iz in enumerate(z.T):
+         iz = iz.reshape(-1, 1)
+         x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
+         p[:,[t]] = Theta_p@x[:,[t]]+N@iz
+     return x[:,:-1], p
+ 
+#         x1 = {str(ix1):ix1_t for ix1, ix1_t in zip(self.vars.x1, x[:,1:])}
+#         p1 = {str(ip1):ip1_t for ip1, ip1_t in zip(self.vars.p1, p[:,1:])}
+#         z = {str(iz):iz_t for iz, iz_t in zip(self.vars.z, z)}
+#         x = {str(ix):ix_t for ix, ix_t in zip(self.vars.x, x[:,:-1])}
+#         p = {str(ip):ip_t for ip, ip_t in zip(self.vars.p, p[:,:-1])}
+#         d =  z|x|p|x1|p1|{'t':np.array(range(T))}
+#         d = self.solve_static(d)
+#         return MITShock(d,self)
+
+def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None):
+    '''
+    Implementation of Klein 2000 method to solve dyamic systems of forward equations
+    '''
+    x0 = np.zeros_like(system.vars.x) if x0 is None else x0
+    z = system.normalize_z(z,T)
+    sol = system.system_solution
+    Theta_x, Theta_p, N, L = sol['Theta_x'], sol['Theta_p'], sol['N'], sol['L']
+    if system.type=='mixed':
+        x, p = simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L)
+        
+        return pd.DataFrame(np.row_stack((np.arange(T+1), x,p, z)).T,
+                           columns = ['t']+system.vars.x+system.vars.p+system.vars.z)
+
+
+
+
 
 class MITShock:
     def __init__(self, d:dict, model:Klein):
