@@ -233,7 +233,7 @@ class DynamicSystem:
         elif self.type=='backward-looking':
             Theta_x = Z@inv(S)@T@inv(Z)
             L = Z@inv(S)@Q@gamma
-            return {'Theta_x': np.real(Theta_x), 'L':np.real(L)}
+            return {'Theta_x': np.real(Theta_x), 'L':np.real(L), 'Theta_p':None, 'N':None}
 
         else:
             Theta_p = Z[n_s:,:n_s]@inv(Z[:n_s,:n_s])
@@ -283,75 +283,18 @@ class DynamicSystem:
         if self.type=='forward-looking':
             return self.simulate_forward_looking_system(z)
 
-    def simulate(self, z:dict[np.array], x0: np.array=None, T:int=None):
-        '''
-        Simulates for a given path of shocks and initial conditions for predetermined variables.
-        x0: initial conditions. Set to 0 if not specified.
-        
-        '''
-        if x0 is None:
-            x0 = np.zeros_like(self.vars.x)        
-        z = self.normalize_z(z,T)
-        
-        if self.type=='mixed':
-            return self.simulate_mixed_system(z, x0)
-        
-        if self.type=='backward-looking':
-            return self.simulate_backward_looking_system(z, x0)
-        
-        if self.type=='forward-looking':
-            return self.simulate_forward_looking_system(z)
-
-    def simulate_mixed_system(self, z:np.array, x0: np.array)->dict[np.array]:
-        sol = self.system_solution
-        Theta_x, Theta_p, N, L = sol['Theta_x'], sol['Theta_p'], sol['N'], sol['L']            
-        T = z.shape[1]
-        x = np.zeros((self.n_x,T+1))
-        x[:,0] = x0
-        p=np.zeros((self.n_p,T+1))
-        for t,iz in enumerate(z.T):
-            iz = iz.reshape(self.n_z,-1)
-            x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
-            p[:,[t]] = Theta_p@x[:,[t]]+N@iz
-        p[:,[t+1]] = Theta_p@x[:,[t+1]]+N@iz
-        
-        x1 = {str(ix1):ix1_t for ix1, ix1_t in zip(self.vars.x1, x[:,1:])}
-        p1 = {str(ip1):ip1_t for ip1, ip1_t in zip(self.vars.p1, p[:,1:])}
-        z = {str(iz):iz_t for iz, iz_t in zip(self.vars.z, z)}
-        x = {str(ix):ix_t for ix, ix_t in zip(self.vars.x, x[:,:-1])}
-        p = {str(ip):ip_t for ip, ip_t in zip(self.vars.p, p[:,:-1])}
-        d =  z|x|p|x1|p1|{'t':np.array(range(T))}
-        d = self.solve_static(d)
-        return MITShock(d,self)
-
-    def simulate_backward_looking_system(self, z:dict[np.array], x0: np.array):
-        sol = self.system_solution
-        Theta_x, L = sol['Theta_x'], sol['L']
-        T = z.shape[1]
-        x = np.zeros((self.n_x,T+1))
-        x[:,0] = x0
-        for t,iz in enumerate(z.T):
-            iz = iz.reshape(self.n_z,-1)
-            x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
-        z = {str(iz):iz_t for iz, iz_t in zip(self.vars.z, z)}
-        x = {str(ix):ix_t for ix, ix_t in zip(self.vars.x, x[:,:-1])}
-        return z|x
-
     def simulate_forward_looking_system(self, z:dict[np.array]):
         raise ValueError('Purely forward looking systems are not implemented')
 
-    def solve_static(self, d:dict[np.array])->dict[np.array]:
-        if self.vars.s == []:
-            return d
-        for s in self.equations.static.calibrated:
-            s_t = []
-            for t in d['t']:
-                d_t = {k:v[t] for k,v in d.items()}
-                s_t.append(float(s.rhs.subs(d_t)))
-            d[str(s.lhs)]= np.array(s_t)
-        return d   
 
-
+def simulate_backward_looking_system(z, x0, Theta_x, L):
+        T = z.shape[1]
+        x = np.zeros((Theta_x.shape[0],T+1))
+        x[:,0] = x0
+        for t,iz in enumerate(z.T):
+            iz = iz.reshape(-1, 1)
+            x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
+        return x
 
 def simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L):
      T = z.shape[1]
@@ -362,33 +305,40 @@ def simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L):
          iz = iz.reshape(-1, 1)
          x[:,[t+1]] = Theta_x@x[:,[t]]+L@iz
          p[:,[t]] = Theta_p@x[:,[t]]+N@iz
-     return x[:,:-1], p
+     return x, p
  
-#         x1 = {str(ix1):ix1_t for ix1, ix1_t in zip(self.vars.x1, x[:,1:])}
-#         p1 = {str(ip1):ip1_t for ip1, ip1_t in zip(self.vars.p1, p[:,1:])}
-#         z = {str(iz):iz_t for iz, iz_t in zip(self.vars.z, z)}
-#         x = {str(ix):ix_t for ix, ix_t in zip(self.vars.x, x[:,:-1])}
-#         p = {str(ip):ip_t for ip, ip_t in zip(self.vars.p, p[:,:-1])}
-#         d =  z|x|p|x1|p1|{'t':np.array(range(T))}
-#         d = self.solve_static(d)
-#         return MITShock(d,self)
+def add_static_variables(system:DynamicSystem, impulse_response:pd.DataFrame)->pd.DataFrame:
+    if system.vars.s == []:
+        return impulse_response
+    for static_equation in system.equations.static.calibrated:
+        static_variable = str(static_equation.lhs)
+        impulse_response[static_variable] = 0
+        for t in impulse_response['t']:
+            impulse_response.loc[t, static_variable] = static_equation.rhs.subs(dict(impulse_response.loc[t]))
+    return impulse_response 
 
-def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None):
+
+def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None)->pd.DataFrame:
     '''
     Implementation of Klein 2000 method to solve dyamic systems of forward equations
     '''
     x0 = np.zeros_like(system.vars.x) if x0 is None else x0
     z = system.normalize_z(z,T)
+    T = z.shape[1]-1 if T is None else T
     sol = system.system_solution
     Theta_x, Theta_p, N, L = sol['Theta_x'], sol['Theta_p'], sol['N'], sol['L']
     if system.type=='mixed':
         x, p = simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L)
-        data = pd.DataFrame(np.row_stack((np.arange(T+1), x,p, z)).T,
-                           columns = ['t']+system.vars.x+system.vars.p+system.vars.z)
-        a=1
-        return pd.DataFrame(np.row_stack((np.arange(T+1), x,p, z)).T,
-                           columns = ['t']+system.vars.x+system.vars.p+system.vars.z)
+        impulse_response = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], p, z)).T,
+                           columns = ['t']+system.vars.x+system.vars.x1+system.vars.p+system.vars.z)
 
+    if system.type == 'backward-looking':
+        x = simulate_backward_looking_system(z, x0, Theta_x, L)
+        impulse_response = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], z)).T,
+                           columns = ['t']+system.vars.x+system.vars.x1+system.vars.z)
+    impulse_response = impulse_response.astype({'t':int})
+    impulse_response = add_static_variables(system, impulse_response)
+    return impulse_response
 
 
 
