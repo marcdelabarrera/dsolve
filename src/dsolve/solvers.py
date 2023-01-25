@@ -383,7 +383,9 @@ def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None):
     Theta_x, Theta_p, N, L = sol['Theta_x'], sol['Theta_p'], sol['N'], sol['L']
     if system.type=='mixed':
         x, p = simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L)
-        
+        data = pd.DataFrame(np.row_stack((np.arange(T+1), x,p, z)).T,
+                           columns = ['t']+system.vars.x+system.vars.p+system.vars.z)
+        a=1
         return pd.DataFrame(np.row_stack((np.arange(T+1), x,p, z)).T,
                            columns = ['t']+system.vars.x+system.vars.p+system.vars.z)
 
