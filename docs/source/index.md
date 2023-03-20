@@ -8,6 +8,14 @@
 ```{toctree}
 :caption: 'Contents:'
 :maxdepth: 2
+usage
+```
+
+```{warning}
+This library is under developement
+```
+
+```{include} ../../README.md
 ```
 
 # Indices and tables
