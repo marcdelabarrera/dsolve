@@ -273,15 +273,6 @@ class DynamicSystem:
                 out[k][:len(v)]=v
         return np.array([v for v in out.values()])
     
-    def impulse_response(self, z:str):
-        if self.type=='mixed':
-            return self.simulate_mixed_system(z)
-        
-        if self.type=='backward-looking':
-            return self.simulate_backward_looking_system(z)
-        
-        if self.type=='forward-looking':
-            return self.simulate_forward_looking_system(z)
 
     def simulate_forward_looking_system(self, z:dict[np.array]):
         raise ValueError('Purely forward looking systems are not implemented')
@@ -307,20 +298,20 @@ def simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L):
          p[:,[t]] = Theta_p@x[:,[t]]+N@iz
      return x, p
  
-def add_static_variables(system:DynamicSystem, impulse_response:pd.DataFrame)->pd.DataFrame:
+def add_static_variables(system:DynamicSystem, mit_shock:pd.DataFrame)->pd.DataFrame:
     if system.vars.s == []:
-        return impulse_response
+        return mit_shock
     for static_equation in system.equations.static.calibrated:
         static_variable = str(static_equation.lhs)
-        impulse_response[static_variable] = 0
-        for t in impulse_response['t']:
-            impulse_response.loc[t, static_variable] = static_equation.rhs.subs(dict(impulse_response.loc[t]))
-    return impulse_response 
+        mit_shock[static_variable] = 0
+        for t in mit_shock['t']:
+            mit_shock.loc[t, static_variable] = static_equation.rhs.subs(dict(mit_shock.loc[t]))
+    return mit_shock 
 
 
-def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None)->pd.DataFrame:
+def mit_shock(system:DynamicSystem, z, x0:np.array = None, T:int=None)->pd.DataFrame:
     '''
-    Implementation of Klein 2000 method to solve dyamic systems of forward equations
+    Computes an MIT shock for a sequence of shocks z
     '''
     x0 = np.zeros_like(system.vars.x) if x0 is None else x0
     z = system.normalize_z(z,T)
@@ -329,16 +320,18 @@ def simulate(system:DynamicSystem, z, x0:np.array = None, T:int=None)->pd.DataFr
     Theta_x, Theta_p, N, L = sol['Theta_x'], sol['Theta_p'], sol['N'], sol['L']
     if system.type=='mixed':
         x, p = simulate_mixed_system(z, x0, Theta_x, Theta_p, N, L)
-        impulse_response = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], p, z)).T,
+        mit_shock = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], p, z)).T,
                            columns = ['t']+system.vars.x+system.vars.x1+system.vars.p+system.vars.z)
 
     if system.type == 'backward-looking':
         x = simulate_backward_looking_system(z, x0, Theta_x, L)
-        impulse_response = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], z)).T,
+        mit_shock = pd.DataFrame(np.row_stack((np.arange(T+1), x[:,:-1], x[:,1:], z)).T,
                            columns = ['t']+system.vars.x+system.vars.x1+system.vars.z)
-    impulse_response = impulse_response.astype({'t':int})
-    impulse_response = add_static_variables(system, impulse_response)
-    return impulse_response
+    mit_shock.columns = [str(i) for i in mit_shock.columns]
+    mit_shock = mit_shock.astype({'t':int})
+    mit_shock = mit_shock.set_index('t')
+    mit_shock = add_static_variables(system, mit_shock)
+    return mit_shock
 
 
 
