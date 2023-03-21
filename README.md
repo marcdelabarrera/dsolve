@@ -4,7 +4,7 @@
 
 ## Sequence Space
 
-$$F(X,\Epsilon)=0$$
+$$F(X,\mathcal{E})=0$$
 
 $$f_t(x_{t-1},x_{t},x_{t+1},\epsilon_t)=0\qquad \forall t$$
 
