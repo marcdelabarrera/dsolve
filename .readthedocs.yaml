@@ -11,6 +11,6 @@ sphinx:
 python:
   install:
     - method: pip
-      path: env
+      path: ./env
       extra_requirements:
         - doc
