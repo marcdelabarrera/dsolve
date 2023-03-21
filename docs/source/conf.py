@@ -7,6 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import sys
 sys.path.append('/bbkinghome/mbarrera/git_supply/dsolve/src/dsolve')
+sys.path.append('/bbkinghome/mbarrera/git_supply/dsolve')
 
 project = 'dsolve'
 copyright = '2023, Marc de la Barrera i Bardalet'
