@@ -9,6 +9,7 @@
 :caption: 'Contents:'
 :maxdepth: 2
 usage
+sequence_space
 ```
 
 
@@ -30,8 +31,5 @@ This library is under developement
 ```
 
 
-```{eval-rst}
-.. autofunction:: sequence_space.sequence_space.foo
-```
 
 

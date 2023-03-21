@@ -21,8 +21,11 @@ extensions = [
     'myst_parser',
     'nbsphinx',
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.mathjax'
 ]
+
+source_suffix = ['.md']
 
 templates_path = ['_templates']
 exclude_patterns = []

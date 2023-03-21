@@ -1,5 +1,16 @@
 # dsolve
 
+`dsolve` is a package to solve systems of dynamic equations in Python. 
+
+## Sequence Space
+
+$$F(X,\Epsilon)=0$$
+
+$$f_t(x_{t-1},x_{t},x_{t+1},\epsilon_t)=0\qquad \forall t$$
+
+
+
+## Symbolic
 A package to solve systems of dynamic equations with Python. It understands $\LaTeX$ syntax and it requires minimum specifications from the user end. It solves problems of the form:
 
 $$A_0\begin{bmatrix}x_{t+1}\\ E_{t}[p_{t+1}]\end{bmatrix}=A_1\begin{bmatrix}x_{t}\\ p_{t}\end{bmatrix}+\gamma z_t$$
