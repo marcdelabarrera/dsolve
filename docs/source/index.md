@@ -30,4 +30,8 @@ This library is under developement
 ```
 
 
+```{eval-rst}
+.. autofunction:: sequence_space.sequence_space.foo
+```
+
 
