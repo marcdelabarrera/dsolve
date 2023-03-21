@@ -9,8 +9,8 @@
 :caption: 'Contents:'
 :maxdepth: 2
 usage
-notebooks/tutorial
 ```
+
 
 ```{warning}
 This library is under developement
@@ -24,3 +24,10 @@ This library is under developement
 - {ref}`genindex`
 - {ref}`modindex`
 - {ref}`search`
+
+```{eval-rst}
+.. autofunction:: utils.normalize_dict
+```
+
+
+

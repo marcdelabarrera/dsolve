@@ -5,6 +5,8 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+import sys
+sys.path.append('/bbkinghome/mbarrera/git_supply/dsolve/src/dsolve')
 
 project = 'dsolve'
 copyright = '2023, Marc de la Barrera i Bardalet'
@@ -16,7 +18,9 @@ release = '0.1.'
 
 extensions = [
     'myst_parser',
-    'nbsphinx'
+    'nbsphinx',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon'
 ]
 
 templates_path = ['_templates']
@@ -29,3 +33,6 @@ exclude_patterns = []
 
 html_theme = 'alabaster'
 html_static_path = ['_static']
+
+
+napoleon_numpy_docstring = True

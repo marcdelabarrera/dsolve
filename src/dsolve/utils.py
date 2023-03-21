@@ -1,9 +1,9 @@
 #General methods used by different classes
 import re
 
-def encode(string)->str:
+def encode(string:str)->str:
     '''
-    Corrects for special characters and adds an extra \
+    Corrects for special characters and adds an extra 
     Examples
     --------
     >>> encode('\beta')
@@ -37,7 +37,20 @@ def normalize_string(string)->str:
         string = re.search('E_{.+?}', string).group()+'['+re.sub('E_{.+?}','',string)+']' #correct E_{t}. for E_{t}[.]
     return string
 
-def normalize_dict(d)->dict:
+def normalize_dict(d:dict)->dict:
+    '''
+    Hello
+
+    Parameters
+    ----------
+    d: dict
+        Dictionary to normalize
+        
+    Returns
+    -------
+    out: dict
+        Normalized dictionary
+    '''
     if d is None:
         return None
     return {normalize_string(k):v for k,v in d.items()}
