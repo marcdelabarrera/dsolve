@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 from scipy.optimize import root
 
-def build_F(f: callable, T:int, ss0: Array, ssT= None)->Array:
+def build_F(f: callable, T:int, ss0: Array, ssT:Array= None, jit:bool=True)->Array:
     '''
     Builds F, which stacks f(x_{t-1},x_{t},x_{t+1},eps_{t}) T times with initial condition x_{-1}=ss0 and
     x_{T+1}=ssT. If ssT is not given, ssT=ss0
@@ -25,7 +25,6 @@ def build_F(f: callable, T:int, ss0: Array, ssT= None)->Array:
         Equilibrium conditions stacked
     '''
     ssT = ss0 if ssT is None else ssT
-    @jax.jit
     def F(X, Eps):
         if len(X)!=T+1 or len(Eps)!=T+1:
             raise ValueError('Incorrect shapes')
@@ -35,6 +34,7 @@ def build_F(f: callable, T:int, ss0: Array, ssT= None)->Array:
             out = out.at[t].set(f(x_ = X[t-1,:], x= X[t,:], x1 = X[t+1,:], eps = Eps[t,:]))
         out = out.at[T].set(f(x_ = X[T-1,:], x = X[T,:], x1 = ssT, eps = Eps[t,:]))
         return out
+    F = jax.jit(F) if jit else F
     F.T = T
     F.ss0 = ss0
     return F

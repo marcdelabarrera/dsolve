@@ -6,11 +6,11 @@ with open("README.md","r") as fh:
 
 setup(
     name = 'dsolve',
-    version = '0.0.10',
+    version = '0.0.11',
     description = 'Solver of dynamic equations with forward looking variables',
     long_description = long_description,
     long_description_content_type='text/markdown',
-    py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers", "dsolve.utils","dsolve.statespace", "dsolve.linearization"],
+    py_modules = ["dsolve.atoms", "dsolve.expressions", "dsolve.solvers", "dsolve.utils","dsolve.sequence_space.sequence_space", "dsolve.linearization"],
     package_dir={'':'src'},
     author='Marc de la Barrera i Bardalet',
     url = 'https://github.com/marcdelabarrera/dsolve',
