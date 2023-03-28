@@ -23,7 +23,7 @@ def build_F(f: callable, T:int, ss0: Array, ssT:Array= None, jit:bool=True)->Arr
     Returns
     -------
     F: callable
-        Equilibrium conditions stacked
+        Equilibrium conditions stacked. Shape is (T,n_x).
     '''
     ssT = ss0 if ssT is None else ssT
     def F(X, Eps):
