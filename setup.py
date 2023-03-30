@@ -6,7 +6,7 @@ with open("README.md","r") as fh:
 
 setup(
     name = 'dsolve',
-    version = '0.0.12',
+    version = '0.0.13',
     description = 'Solver of dynamic equations with forward looking variables',
     long_description = long_description,
     long_description_content_type='text/markdown',
