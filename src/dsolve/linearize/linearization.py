@@ -1,7 +1,14 @@
 import sympy as sym
 
 
-def linearize(f:sym.Function, order:float=2, type:str='log-linearize',x:list[sym.Symbol] = None, x_ss:list[float] = None, f_ss:float = None)->sym.core.add.Add:
+
+
+def linearize(f:sym.Function, 
+              order:float=2, 
+              type:str='log-linearize',
+              x:list[sym.Symbol] = None, 
+              x_ss:list[float] = None, 
+              f_ss:float = None)->sym.core.add.Add:
     '''
     Log-linearizes f up to a second order around a steady state x_ss. 
     Parameters
