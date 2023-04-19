@@ -8,7 +8,6 @@ from functools import partial
 
 equilibrium_conditions = Callable[[Array, Array, Array, Array, Array, Array],Array]
 
-
 @partial(jax.jit, static_argnames='h')
 def lead(X, h=1, fill_value=None):
     fill_value = X[-1:] if fill_value is None else fill_value
@@ -24,24 +23,6 @@ def lag(X, h=1, fill_value=None):
         return jnp.concatenate([jnp.tile(fill_value, h), X[:-h], ])
     if len(X.shape)==2:
         return jnp.concatenate([jnp.tile(fill_value, (h,1)), X[:-h]])
-    
-# @dataclass
-# class SequenceSpaceModel:
-#     '''
-#     Dataclass that defines a model to be solved using the sequence space method, which involves solving
-#     a system of equations F(X,Eps)=0.
-#     '''
-#     f: equilibrium_conditions
-#     T: int
-#     ss0: Array #TODO: ss0 could be computed from equilibrium_conditions
-#     ssT: Array = None
-#     jit: bool = True
-
-#     def __post_init__(self):
-#         self.ssT = self.ss0 if self.ssT is None else self.ssT
-#         self.F = _build_F(self.f, self.T, self.ss0, self.ssT, jit=self.jit)
-#         self.n_x = len(self.ss0)
-
 
 def _build_F(f: equilibrium_conditions, initial_ss: Array, final_ss:Array= None, jit:bool=True)->Array:
     '''
@@ -73,7 +54,20 @@ def _build_F(f: equilibrium_conditions, initial_ss: Array, final_ss:Array= None,
     F = jax.jit(F) if jit else F
     return F
 
-def solve_impulse_response(f: equilibrium_conditions, Eps, initial_ss: Array, final_ss:Array= None):
+def solve_impulse_response(f: equilibrium_conditions, Eps:Array, initial_ss: Array, final_ss:Array= None):
+    '''
+    Solves the equilibrium for a given path of shocks Eps.
+    Parameters
+    ----------
+    f: callable
+        Residual of the equilibrium conditions f(x_{t-1},x_{t},x_{t+1},eps_{t-1},eps_{t},eps_{t+1})=0
+    Eps: Array
+        Path of shocks for which to solve the impulse response. It has shape (T x n_shocks)
+    initial_ss: Array
+        Initial steady state that defines x_{-1}
+    final_ss: Array
+        Final steady state that defines x_{T+1}. If None, assume the model reverts back to the initial steady state
+    '''
     F = _build_F(f, initial_ss, final_ss)
     T = Eps.shape[0]
     n_x = len(initial_ss)
@@ -81,6 +75,24 @@ def solve_impulse_response(f: equilibrium_conditions, Eps, initial_ss: Array, fi
     sol = root(lambda x: F(x.reshape(-1,n_x), Eps).flatten(), x0=X_guess.flatten())
     X = sol.x.reshape(-1,n_x)
     return X
+
+
+# @dataclass
+# class SequenceSpaceModel:
+#     '''
+#     Dataclass that defines a model to be solved using the sequence space method, which involves solving
+#     a system of equations F(X,Eps)=0.
+#     '''
+#     f: equilibrium_conditions
+#     T: int
+#     ss0: Array #TODO: ss0 could be computed from equilibrium_conditions
+#     ssT: Array = None
+#     jit: bool = True
+
+#     def __post_init__(self):
+#         self.ssT = self.ss0 if self.ssT is None else self.ssT
+#         self.F = _build_F(self.f, self.T, self.ss0, self.ssT, jit=self.jit)
+#         self.n_x = len(self.ss0)
 
 
 # def solve_impulse_response(model:SequenceSpaceModel, Eps: Array, X_guess: Array = None)->Array:
