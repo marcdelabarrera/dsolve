@@ -4,28 +4,46 @@ import jax.numpy as jnp
 from scipy.optimize import root
 from typing import Callable
 from dataclasses import dataclass
-
+from functools import partial
 
 equilibrium_conditions = Callable[[Array, Array, Array, Array, Array, Array],Array]
 
-@dataclass
-class SequenceSpaceModel:
-    '''
-    Dataclass that defines a model to be solved using the sequence space method, which involves solving
-    a system of equations F(X,Eps)=0.
-    '''
-    f: equilibrium_conditions
-    T: int
-    ss0: Array
-    ssT: Array = None
 
-    def __post_init__(self):
-        self.ssT = self.ss0 if self.ssT is None else self.ssT
-        self.F = _build_F(self.f, self.T, self.ss0, self.ssT, jit=True)
-        self.n_x = len(self.ss0)
+@partial(jax.jit, static_argnames='h')
+def lead(X, h=1, fill_value=None):
+    fill_value = X[-1:] if fill_value is None else fill_value
+    if len(X.shape)==1:
+        return jnp.concatenate([X[h:], jnp.tile(fill_value, h)])
+    if len(X.shape)==2:
+        return jnp.concatenate([X[h:], jnp.tile(fill_value, (h,1))])
+    
+@partial(jax.jit, static_argnames='h')
+def lag(X, h=1, fill_value=None):
+    fill_value = X[0] if fill_value is None else fill_value
+    if len(X.shape)==1:
+        return jnp.concatenate([jnp.tile(fill_value, h), X[:-h], ])
+    if len(X.shape)==2:
+        return jnp.concatenate([jnp.tile(fill_value, (h,1)), X[:-h]])
+    
+# @dataclass
+# class SequenceSpaceModel:
+#     '''
+#     Dataclass that defines a model to be solved using the sequence space method, which involves solving
+#     a system of equations F(X,Eps)=0.
+#     '''
+#     f: equilibrium_conditions
+#     T: int
+#     ss0: Array #TODO: ss0 could be computed from equilibrium_conditions
+#     ssT: Array = None
+#     jit: bool = True
+
+#     def __post_init__(self):
+#         self.ssT = self.ss0 if self.ssT is None else self.ssT
+#         self.F = _build_F(self.f, self.T, self.ss0, self.ssT, jit=self.jit)
+#         self.n_x = len(self.ss0)
 
 
-def _build_F(f: equilibrium_conditions, T:int, ss0: Array, ssT:Array= None, jit:bool=True)->Array:
+def _build_F(f: equilibrium_conditions, initial_ss: Array, final_ss:Array= None, jit:bool=True)->Array:
     '''
     Builds F, which stacks f(x_{t-1},x_{t},x_{t+1},eps_{t-1},eps_{t},eps_{t+1}) T times with initial condition x_{-1}=ss0 and
     x_{T+1}=ssT. If ssT is not given, ssT=ss0
@@ -46,46 +64,73 @@ def _build_F(f: equilibrium_conditions, T:int, ss0: Array, ssT:Array= None, jit:
     F: callable
         Equilibrium conditions stacked. Shape is (T,n_x).
     '''
-    f = lambda **x: f(**x)
+    final_ss = initial_ss if final_ss is None else final_ss
     def F(X, Eps):
-        # check correct array size for X and Eps
-        if len(X)!=T+1 or len(Eps)!=T+1: 
-            raise ValueError(f'Incorrect shapes')
-        
-        out = jnp.zeros((T+1, len(ss0)))
-        out = out.at[0].set(f(x_ = ss0, x = X[0,:], x1 = X[1,:], eps_ = Eps[0,:]*0, eps = Eps[0,:], eps1 = Eps[1,:]))
-        for t in range(1,T):
-            out = out.at[t].set(f(x_ = X[t-1,:], x= X[t,:], x1 = X[t+1,:], eps_ = Eps[t-1,:], eps = Eps[t,:], eps1 = Eps[t+1,:]))
-        out = out.at[T].set(f(x_ = X[T-1,:], x = X[T,:], x1 = ssT, eps_ = Eps[T-1,:], eps = Eps[T,:], eps1 = 0*Eps[T,:]))
-        return out
+        X_, X1 = lag(X, fill_value = initial_ss), lead(X, fill_value = final_ss)
+        Eps_, Eps1 = lag(Eps,fill_value=jnp.zeros(Eps.shape[1])), lead(Eps)
+        return jax.vmap(f)(X_,X,X1,Eps_, Eps, Eps1)
     
     F = jax.jit(F) if jit else F
     return F
 
-
-def solve_impulse_response(model:SequenceSpaceModel, Eps: Array, X_guess: Array = None)->Array:
-    '''
-    Solves a SequenceSpaceModel for a given path of perfect-foresight shocks Eps
-    Parameters
-    ----------
-    model: SequenceSpaceModel
-    Eps: Array
-    Returns
-    -------
-    X: Array
-    '''
-    if len(Eps)!=model.T+1:
-        raise ValueError(f'Wrong dimensions for Eps, len should be {model.T+1}')
-    
-    n_x = model.n_x
-    X_guess = X_guess if X_guess is not None else jnp.tile(model.ss0,(model.T+1,1))
-
-    sol = root(lambda x: model.F(x.reshape(-1,n_x),Eps).flatten(), x0=X_guess.flatten())
-
+def solve_impulse_response(f: equilibrium_conditions, Eps, initial_ss: Array, final_ss:Array= None):
+    F = _build_F(f, initial_ss, final_ss)
+    T = Eps.shape[0]
+    n_x = len(initial_ss)
+    X_guess = jnp.tile(initial_ss,(T,1))
+    sol = root(lambda x: F(x.reshape(-1,n_x), Eps).flatten(), x0=X_guess.flatten())
     X = sol.x.reshape(-1,n_x)
-
-    if jnp.max(jnp.abs(sol.fun))>1e-5:
-        print(sol)
-        raise ValueError(f'Solution not achieved')
     return X
 
+
+# def solve_impulse_response(model:SequenceSpaceModel, Eps: Array, X_guess: Array = None)->Array:
+#     '''
+#     Solves a SequenceSpaceModel for a given path of perfect-foresight shocks Eps
+#     Parameters
+#     ----------
+#     model: SequenceSpaceModel
+#     Eps: Array
+#     Returns
+#     -------
+#     X: Array
+#     '''
+#     if len(Eps)!=model.T+1:
+#         raise ValueError(f'Wrong dimensions for Eps, len should be {model.T+1}')
+    
+#     n_x = model.n_x
+#     X_guess = X_guess if X_guess is not None else jnp.tile(model.ss0,(model.T+1,1))
+
+#     sol = root(lambda x: model.F(x.reshape(-1,n_x),Eps).flatten(), x0=X_guess.flatten())
+
+#     X = sol.x.reshape(-1,n_x)
+
+#     #if jnp.max(jnp.abs(sol.fun))>1e-5:
+#     #    print(sol)
+#     #    raise ValueError(f'Solution not achieved')
+#     return X
+
+
+# # def lead(x: Array, xT: float=None, h:int=1)->Array:
+#     '''
+#     Given vector x_{t}, returns x_{t+h}
+#     Example
+#     -------
+#     x = jnp.array([1,2,3])
+#     lead(x)
+#     [2,3,3]
+#     '''
+#     #TODO: implement h
+#     xT = xT if xT is not None else x[-1]
+#     return jnp.concatenate([x[1:], jnp.atleast_1d(xT)])
+
+# def lag(x: Array, xT: float=None, h:int=1)->Array:
+#     '''
+#     Given vector x_{t}, returns x_{t-h}
+#     Example
+#     -------
+#     x = jnp.array([1,2,3])
+#     lag(x)
+#     [1,1,2]
+#     '''
+#     xT = xT if xT is not None else x[-1]
+#     return jnp.concatenate([jnp.atleast_1d(xT), x[1:]])
