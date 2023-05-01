@@ -5,8 +5,20 @@ from scipy.optimize import root
 from typing import Callable
 from dataclasses import dataclass
 from functools import partial
+import warnings 
+jax.config.update("jax_enable_x64", True)
 
 equilibrium_conditions = Callable[[Array, Array, Array, Array, Array, Array],Array]
+
+@jax.jit
+def log_deviation(X:Array, X_ss:Array=None)->Array:
+    '''
+    Computes the log deviation from the steady state. If X_ss is not given, it is assumed to be the last value of X.
+    '''
+    X_ss = X.iloc[-1] if X_ss is None else X_ss
+    return 100*(jnp.log(X)-jnp.log(X_ss))
+
+
 
 @partial(jax.jit, static_argnames='h')
 def lead(X, h=1, fill_value=None):
@@ -49,7 +61,7 @@ def _build_F(f: equilibrium_conditions, initial_ss: Array, final_ss:Array= None,
     def F(X, Eps):
         X_, X1 = lag(X, fill_value = initial_ss), lead(X, fill_value = final_ss)
         Eps_, Eps1 = lag(Eps,fill_value=jnp.zeros(Eps.shape[1])), lead(Eps)
-        return jax.vmap(f)(X_,X,X1,Eps_, Eps, Eps1)
+        return jax.vmap(f)(X_, X, X1, Eps_, Eps, Eps1)
     
     F = jax.jit(F) if jit else F
     return F
@@ -72,9 +84,15 @@ def solve_impulse_response(f: equilibrium_conditions, Eps:Array, initial_ss: Arr
     T = Eps.shape[0]
     n_x = len(initial_ss)
     X_guess = jnp.tile(initial_ss,(T,1))
-    sol = root(lambda x: F(x.reshape(-1,n_x), Eps).flatten(), x0=X_guess.flatten())
+    sol = root(lambda x: F(x.reshape(-1, n_x), Eps).flatten(), x0=X_guess.flatten())
     X = sol.x.reshape(-1,n_x)
-    return X
+    max_error = jnp.max(jnp.abs(sol.fun))
+    if max_error>1e-5:
+        warnings.warn(f'Maximum error is {max_error}.')
+    #if not sol.success:
+    #    print(sol)
+    #    raise ValueError(f'Solution not achieved.')
+    return X, sol.fun.reshape(-1,n_x)
 
 
 # @dataclass
